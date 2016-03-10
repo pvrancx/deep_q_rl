@@ -132,7 +132,8 @@ class DeepQLearner:
             W=lasagne.init.Constant(0.0),
             b=lasagne.init.Constant(0.0)
         )
-        pred_phi, pred_r = lasagne.layers.get_output([self.l_phi,self.l_rew])
+        pred_phi, pred_r = lasagne.layers.get_output([self.l_phi,self.l_rew],
+                                                     states / input_scale)
         loss_r = T.mean((rewards - pred_r[T.arange(batch_size),
                                actions.reshape((-1,))].reshape((-1, 1)))**2)
         
@@ -185,6 +186,19 @@ class DeepQLearner:
             actions: self.actions_shared,
             terminals: self.terminals_shared
         }
+        
+        givens_phi = {
+            states: self.states_shared,
+            next_states: self.next_states_shared,
+            actions: self.actions_shared
+        }
+        
+        givens_r = {
+            states: self.states_shared,
+            rewards: self.rewards_shared,
+            actions: self.actions_shared
+        }
+        
         if update_rule == 'deepmind_rmsprop':
             updates = deepmind_rmsprop(loss, params, self.lr, self.rho,
                                        self.rms_epsilon)
@@ -206,10 +220,10 @@ class DeepQLearner:
         self._train = theano.function([], [loss, q_vals], updates=updates,
                                       givens=givens)
         self._train_r = theano.function([], [loss_r,pred_r], updates=updates_r,
-                                      givens=givens)
+                                      givens=givens_r)
         self._train_phi = theano.function([], [loss_phi,pred_phi], 
                                           updates=updates_phi,
-                                      givens=givens)
+                                      givens=givens_phi)
         self._q_vals = theano.function([], q_vals,
                                        givens={states: self.states_shared})
         self._pred_r = theano.function([], pred_r,
