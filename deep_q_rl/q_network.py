@@ -53,6 +53,12 @@ class DeepQLearner:
 
         self.l_out = self.build_network(network_type, input_width, input_height,
                                         num_actions, num_frames, batch_size)
+                                        
+        #last hidden layer
+        self.l_hid = lasagne.layers.get_all_layers(self.l_out)[-2]
+        self.num_phi = lasagne.layers.get_output_shape(self.l_hid)[-1]
+        
+                        
         # theano.compile.function_dump('network.dump', self.l_out)
         if self.freeze_interval > 0:
             self.next_l_out = self.build_network(network_type, input_width,
@@ -101,6 +107,48 @@ class DeepQLearner:
                   self.discount * T.max(next_q_vals, axis=1, keepdims=True))
         diff = target - q_vals[T.arange(batch_size),
                                actions.reshape((-1,))].reshape((-1, 1))
+                               
+        #model
+        phi = lasagne.layers.get_output(self.l_hid, states / input_scale) 
+        next_phi = lasagne.layers.get_output(self.l_hid, 
+                                             next_states / input_scale)
+                        
+        #do not backprop through features
+        phi = theano.gradient.disconnected_grad(phi)
+        next_phi = theano.gradient.disconnected_grad(next_phi)
+        
+        #linear model
+        self.l_phi = lasagne.layers.DenseLayer(
+            self.l_hid,
+            num_units=self.num_actions * self.num_phi,
+            nonlinearity=None,
+            W=lasagne.init.Constant(0.0),
+            b=lasagne.init.Constant(0.0)
+        )
+        self.l_rew = lasagne.layers.DenseLayer(
+            self.l_hid,
+            num_units=self.num_actions,
+            nonlinearity=None,
+            W=lasagne.init.Constant(0.0),
+            b=lasagne.init.Constant(0.0)
+        )
+        pred_phi, pred_r = lasagne.layers.get_output([self.l_phi,self.l_rew])
+        loss_r = T.mean((rewards - pred_r[T.arange(batch_size),
+                               actions.reshape((-1,))].reshape((-1, 1)))**2)
+        
+        
+        
+        indexes = T.arange(self.batch_size).dimshuffle('x', 0)
+        #max index
+        mask = T.lt(indexes,self.num_phi*(actions.dimshuffle(0, 'x')+1))
+        #min index
+        mask = (mask & T.ge(indexes, self.num_phi*(actions.dimshuffle(0, 'x'))))
+        
+        loss_phi = T.mean(mask*(pred_phi - 
+                    T.tile(next_phi,[1,self.num_actions]))**2)
+
+        #rew cost
+        #/model
 
         if self.clip_delta > 0:
             # If we simply take the squared clipped diff as our loss,
@@ -126,6 +174,10 @@ class DeepQLearner:
             raise ValueError("Bad accumulator: {}".format(batch_accumulator))
 
         params = lasagne.layers.helper.get_all_params(self.l_out)  
+        #only train output layers for model
+        params_r = [self.l_rew.W, self.l_rew.b] 
+        params_phi = [self.l_phi.W, self.l_phi.b]
+        
         givens = {
             states: self.states_shared,
             next_states: self.next_states_shared,
@@ -147,10 +199,22 @@ class DeepQLearner:
         if self.momentum > 0:
             updates = lasagne.updates.apply_momentum(updates, None,
                                                      self.momentum)
+                                                     
+        updates_r = lasagne.updates.sgd(loss_r, params_r, self.lr)
+        updates_phi = lasagne.updates.sgd(loss_phi, params_phi, self.lr)
 
         self._train = theano.function([], [loss, q_vals], updates=updates,
                                       givens=givens)
+        self._train_r = theano.function([], [loss_r,pred_r], updates=updates_r,
+                                      givens=givens)
+        self._train_phi = theano.function([], [loss_phi,pred_phi], 
+                                          updates=updates_phi,
+                                      givens=givens)
         self._q_vals = theano.function([], q_vals,
+                                       givens={states: self.states_shared})
+        self._pred_r = theano.function([], pred_r,
+                                       givens={states: self.states_shared})
+        self._pred_phi = theano.function([], pred_phi,
                                        givens={states: self.states_shared})
 
     def build_network(self, network_type, input_width, input_height,
