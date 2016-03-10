@@ -87,7 +87,7 @@ class NeuralAgent(object):
 
     def _open_learning_file(self):
         self.learning_file = open(self.exp_dir + '/learning.csv', 'w', 0)
-        self.learning_file.write('mean_loss,epsilon\n')
+        self.learning_file.write('mean_loss,epsilon,loss_r,loss_pho\n')
         self.learning_file.flush()
 
     def _update_results_file(self, epoch, num_episodes, holdout_sum):
@@ -98,7 +98,9 @@ class NeuralAgent(object):
         self.results_file.flush()
 
     def _update_learning_file(self):
-        out = "{},{}\n".format(np.mean(self.loss_averages),
+        out = "{},{},{},{}\n".format(np.mean(self.loss_averages),
+                                np.mean(self.loss_r_averages),
+                                np.mean(self.loss_phi_averages),
                                self.epsilon)
         self.learning_file.write(out)
         self.learning_file.flush()
@@ -122,6 +124,8 @@ class NeuralAgent(object):
 
         # We report the mean loss for every epoch.
         self.loss_averages = []
+        self.loss_r_averages = []
+        self.loss_phi_averages = []
 
         self.start_time = time.time()
         return_action = self.rng.randint(0, self.num_actions)
@@ -178,9 +182,11 @@ class NeuralAgent(object):
                                              np.clip(reward, -1, 1))
 
                 if self.step_counter % self.update_frequency == 0:
-                    loss = self._do_training()
+                    loss,loss_r,loss_phi = self._do_training()
                     self.batch_counter += 1
                     self.loss_averages.append(loss)
+                    self.loss_r_averages.append(loss_r)
+                    self.loss_phi_averages.append(loss_phi)
 
             else: # Still gathering initial random data...
                 action = self._choose_action(self.data_set, self.epsilon,

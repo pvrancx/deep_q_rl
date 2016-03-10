@@ -134,7 +134,7 @@ class DeepQLearner:
         )
         pred_phi, pred_r = lasagne.layers.get_output([self.l_phi,self.l_rew],
                                                      states / input_scale)
-        loss_r = T.mean((rewards - pred_r[T.arange(batch_size),
+        loss_r = T.mean(0.5*(rewards - pred_r[T.arange(batch_size),
                                actions.reshape((-1,))].reshape((-1, 1)))**2)
         
         
@@ -145,7 +145,7 @@ class DeepQLearner:
         #min index
         mask = (mask & T.ge(indexes, self.num_phi*(actions.dimshuffle(0, 'x'))))
         
-        loss_phi = T.mean(mask*(pred_phi - 
+        loss_phi = T.mean(0.5*mask*(pred_phi - 
                     T.tile(next_phi,[1,self.num_actions]))**2)
 
         #rew cost
@@ -300,8 +300,10 @@ class DeepQLearner:
             self.update_counter % self.freeze_interval == 0):
             self.reset_q_hat()
         loss, _ = self._train()
+        loss_r, _ = self._train_r()
+        loss_phi, _ = self._train_phi()
         self.update_counter += 1
-        return np.sqrt(loss)
+        return np.sqrt(loss),np.sqrt(loss_r),np.sqrt(loss_phi)
 
     def q_vals(self, state):
         # Might be a slightly cheaper way by reshaping the passed-in state,
