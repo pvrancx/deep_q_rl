@@ -2,18 +2,26 @@
 The NeuralAgent class wraps a deep Q-network for training and testing
 in the Arcade learning environment.
 
-Author: Nathan Sprague
+original author: Nathan Sprague
+
+adapted by Peter vrancx
 
 """
 
-import os
+#import os
 import cPickle
 import time
 import logging
 
+import pymongo
+from mongo_dataset import MongoDataset
+
+
 import numpy as np
 
-import ale_data_set
+#import ale_data_set
+
+
 
 import sys
 sys.setrecursionlimit(10000)
@@ -42,18 +50,26 @@ class NeuralAgent(object):
         self.exp_dir = save_path
         self.num_actions = self.network.num_actions
         logging.info("Creating data sets")
-        self.data_set = ale_data_set.DataSet(width=self.image_width,
-                                             height=self.image_height,
-                                             rng=rng,
-                                             max_steps=self.replay_memory_size,
-                                             phi_length=self.phi_length)
+        client = pymongo.MongoClient()
+        db = client.exp_database
+        self.data_set = MongoDataset(db,'training_data',
+                         obs_shape=(self.image_width,
+                                    self.image_height),
+                         act_shape = (1,),
+                        hist_len = self.phi_length,
+                        act_type='int32'
+                        )
+
 
         # just needs to be big enough to create phi's
-        self.test_data_set = ale_data_set.DataSet(width=self.image_width,
-                                                  height=self.image_height,
-                                                  rng=rng,
-                                                  max_steps=self.phi_length * 2,
-                                                  phi_length=self.phi_length)
+        self.test_data_set = MongoDataset(db,'test_data',
+                         obs_shape=(self.image_width,
+                                    self.image_height),
+                         act_shape = (1,),
+                        hist_len = self.phi_length,
+                        act_type='int32'
+                        )
+                        
         logging.info("Finished creating data sets")
         self.epsilon = self.epsilon_start
         if self.epsilon_decay != 0:
@@ -72,11 +88,17 @@ class NeuralAgent(object):
 
         self.holdout_data = None
 
+        self.agent_id = 0
+
         # In order to add an element to the data set we need the
         # previous state and action and the current reward.  These
         # will be used to store states and actions.
         self.last_img = None
         self.last_action = None
+        
+
+        
+
 
     def _open_results_file(self):
         logging.info("OPENING " + self.exp_dir + '/results.csv')
@@ -119,7 +141,9 @@ class NeuralAgent(object):
         self.step_counter = 0
         self.batch_counter = 0
         self.episode_reward = 0
+        self.episode_counter += 1
 
+        
         # We report the mean loss for every epoch.
         self.loss_averages = []
 
@@ -199,7 +223,14 @@ class NeuralAgent(object):
         the current policy.
         """
 
-        data_set.add_sample(self.last_img, self.last_action, reward, False)
+        data_set.add_sample(self.last_img, 
+                            self.last_action, 
+                            reward, 
+                            False,
+                            self.episode_counter,
+                            self.step_counter,
+                            self.agent_id
+                            )
         if self.step_counter >= self.phi_length:
             phi = data_set.phi(cur_img)
             action = self.network.choose_action(phi, epsilon)
@@ -244,12 +275,15 @@ class NeuralAgent(object):
                 self.episode_counter += 1
                 self.total_reward += self.episode_reward
         else:
-
             # Store the latest sample.
             self.data_set.add_sample(self.last_img,
                                      self.last_action,
                                      np.clip(reward, -1, 1),
-                                     True)
+                                     True,
+                                     self.episode_counter,
+                                     self.step_counter,
+                                     self.agent_id
+                                     )
 
             logging.debug("steps/second: {:.2f}".format(\
                             self.step_counter/total_time))

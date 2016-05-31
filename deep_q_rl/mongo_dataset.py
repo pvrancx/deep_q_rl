@@ -11,6 +11,10 @@ import pymongo
 from bson.objectid import ObjectId
 from bson import Binary
 import copy
+from collections import deque
+import theano
+
+floatX = theano.config.floatX
 
 class MongoDataset(object):
     def __init__(self,db,exp_name, obs_shape, act_shape = (1,), hist_len=4, 
@@ -23,6 +27,13 @@ class MongoDataset(object):
         self.obs_shape = obs_shape
         self.obs_type = obs_type
         self.act_type = act_type
+        self.obs_queue = deque()
+        
+    def store_obs(self,obs):
+        if len(self.obs_queue) > max((self.hist_len-2),0):
+            self.obs_queue.popleft()
+        self.obs_queue.append(obs)
+
         
     def add_sample(self,obs, action, reward, terminal,
                    ep_id=0,step_id=0,agent_id=0):
@@ -39,7 +50,19 @@ class MongoDataset(object):
         
         
         }
+
         self._collection.insert_one(trans)
+        if terminal:
+            self.obs_queue.clear()
+        else:
+            self.store_obs(obs)
+        
+    def phi(self,obs):
+        phi = np.zeros((self.hist_len,)+ self.obs_shape, 
+                        dtype=floatX)
+        phi[0:len(self.obs_queue),] = self.obs_queue
+        phi[-1,] = obs
+        return phi
         
     def random_batch(self, batch_size):
         count = 0
@@ -49,12 +72,12 @@ class MongoDataset(object):
             result = self._collection.find(query).sort('r_idx').limit(batch_size)
             count = result.count()
             
-        phis = np.zeros((batch_size,)+self.obs_shape+(self.hist_len,),
+        phis = np.zeros((batch_size,self.hist_len)+self.obs_shape,
                        dtype= self.obs_type)
         phis_next = np.zeros_like(phis)
         acts = np.zeros((batch_size,)+self.act_shape, dtype = self.act_type)
-        rewards = np.zeros(batch_size)
-        term = np.zeros(batch_size, dtype=bool)
+        rewards = np.zeros((batch_size,1))
+        term = np.zeros((batch_size,1), dtype=bool)
         
         
         for batch_idx, r in enumerate(result):
@@ -63,6 +86,7 @@ class MongoDataset(object):
             steps = range(r['step_id']-self.hist_len+1,r['step_id']+2)
             query = {'ep_id': r['ep_id'],'step_id': {'$in': steps}}
             trans = self._collection.find(query).sort('step_id',-1)
+
             #go through steps in descending order
             for t_idx, st in enumerate(trans):
                 #epsiode end, stop history
@@ -70,11 +94,16 @@ class MongoDataset(object):
                     break
                 obs = pickle.loads(st['obs'])
                 
+                
                 #phis is obs[i:i+hist_len], phi_next is obs[i+1,i+hist_len+1]
                 if t_idx != 0: #last obs is not part of phi
-                    phis[batch_idx,:,-t_idx] = copy.copy(obs)
-                if t_idx < self.hist_len:   
-                    phis_next[batch_idx,:,-(t_idx+1)] = copy.copy(obs)
+                    sl = [batch_idx,-t_idx]+\
+                        [slice(None)]*len(self.obs_shape)
+                    phis[sl] = copy.copy(obs)
+                if t_idx < self.hist_len:
+                    sl = [batch_idx,-(t_idx+1)]+\
+                        [slice(None)]*len(self.obs_shape)
+                    phis_next[sl] = copy.copy(obs)
                 
                 #check last step to see if phi_next is terminal
                 if t_idx == 0:
@@ -95,7 +124,18 @@ class MongoDataset(object):
                 }, upsert=False)
                     
         
-        return (phis,acts,rewards,term,phis_next)
+        return (phis,acts,rewards,phis_next,term)
+        
+        
+    def __len__(self):
+        """Return an approximate count of stored state transitions."""
+        return max(0, self._collection.count() - self.hist_len)
                        
             
-        
+if __name__ == "__main__":
+    client = pymongo.MongoClient()
+    db = client.test_database
+    sample_db = MongoDataset(db,'test_exp',
+                         obs_shape=(4,),
+                         act_shape = (1,))
+    print len(sample_db)
