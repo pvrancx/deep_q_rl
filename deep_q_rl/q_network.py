@@ -233,6 +233,13 @@ class DeepQLearner:
         states[0, ...] = state
         self.states_shared.set_value(states)
         return self._q_vals()[0]
+        
+    def set_params(self,params):
+        lasagne.layers.helper.set_all_param_values(self.l_out, params)
+
+    def get_params(self):
+        return lasagne.layers.helper.get_all_param_values(self.l_out)
+        
 
     def choose_action(self, state, epsilon):
         if self.rng.rand() < epsilon:

@@ -15,6 +15,7 @@ import logging
 
 import pymongo
 from mongo_dataset import MongoDataset
+from param_server import ParameterServer
 
 
 import numpy as np
@@ -69,6 +70,9 @@ class NeuralAgent(object):
                         hist_len = self.phi_length,
                         act_type='int32'
                         )
+        
+        self.param_server = ParameterServer(db,'params')
+        self.param_server.add_params(self.network.get_params())
                         
         logging.info("Finished creating data sets")
         self.epsilon = self.epsilon_start
@@ -245,11 +249,9 @@ class NeuralAgent(object):
         May be overridden if a subclass needs to train the network
         differently.
         """
-        states, actions, rewards, next_states, terminals = \
-                                self.data_set.random_batch(
-                                    self.network.batch_size)
-        return self.network.train(states, actions, rewards,
-                                  next_states, terminals)
+        params,loss =self.param_server.get_params()
+        self.network.set_params(params)
+        return loss
 
 
     def end_episode(self, reward, terminal=True):

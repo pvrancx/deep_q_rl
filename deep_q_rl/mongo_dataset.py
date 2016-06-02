@@ -12,6 +12,7 @@ from bson.objectid import ObjectId
 from bson import Binary
 import copy
 from collections import deque
+import datetime
 import theano
 
 floatX = theano.config.floatX
@@ -37,6 +38,7 @@ class MongoDataset(object):
         
     def add_sample(self,obs, action, reward, terminal,
                    ep_id=0,step_id=0,agent_id=0):
+        utc_timestamp = datetime.datetime.utcnow()
         trans = {
             'obs': Binary( pickle.dumps( copy.copy(obs), 
                                                        protocol=2) ),
@@ -46,9 +48,8 @@ class MongoDataset(object):
             'agent': agent_id,
             'ep_id':ep_id,
             'step_id':step_id,
-            'r_idx': np.random.rand()
-        
-        
+            'r_idx': np.random.rand(),
+            'timestamp': utc_timestamp
         }
 
         self._collection.insert_one(trans)
