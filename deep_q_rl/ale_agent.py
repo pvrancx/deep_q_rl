@@ -309,13 +309,18 @@ class NeuralAgent(object):
 
     def start_testing(self):
         self.testing = True
-        self.total_reward = 0
+        self.total_reward = 0        
+        self.episode_counter_old = self.episode_counter
         self.episode_counter = 0
+
+
 
     def finish_testing(self, epoch):
         start_time = time.time()
         self.testing = False
         holdout_size = 3200
+        self.episode_counter = self.episode_counter_old
+
 
         # TODO check out holdout size in original code
         # Keep a random subset of transitions to evaluate performance over time
