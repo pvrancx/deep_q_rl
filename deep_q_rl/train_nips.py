@@ -24,7 +24,7 @@ class Defaults:
     # Agent/Network parameters:
     
     PHI_LENGTH = 4
-    UPDATE_FREQUENCY = 50            # upload new parameters every 50 steps
+    UPDATE_FREQUENCY = 10            # upload new parameters every 50 steps
     BATCH_SIZE = 32
     REPLAY_START_SIZE = 1000
     RESIZED_WIDTH = 84

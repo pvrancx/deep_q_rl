@@ -11,7 +11,7 @@ def create_db(exp_name,host='localhost',port=27017):
     client = pymongo.MongoClient(host, port)
     db = client[exp_name]
     p_collection = db['params']
-    d_collection = db['transitions']
+    d_collection = db['training_data']
     d_collection.remove({})
     p_collection.remove({})
     d_collection.create_index([("ep_id", pymongo.ASCENDING),
