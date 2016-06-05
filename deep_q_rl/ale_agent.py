@@ -29,7 +29,7 @@ sys.setrecursionlimit(10000)
 
 class NeuralAgent(object):
 
-    def __init__(self, q_network, epsilon_start, epsilon_min,
+    def __init__(self, db, q_network, epsilon_start, epsilon_min,
                  epsilon_decay, replay_memory_size, replay_start_size, 
                  update_frequency, rng, save_path, profile):
 
@@ -51,8 +51,7 @@ class NeuralAgent(object):
         self.exp_dir = save_path
         self.num_actions = self.network.num_actions
         logging.info("Creating data sets")
-        client = pymongo.MongoClient()
-        db = client.exp_database
+
         self.data_set = MongoDataset(db,'training_data',
                          obs_shape=(self.image_width,
                                     self.image_height),

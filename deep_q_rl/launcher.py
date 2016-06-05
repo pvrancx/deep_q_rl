@@ -18,6 +18,8 @@ import ale_experiment
 import ale_agent
 import q_network
 import profile
+import pymongo
+from create_database import create_db
 
 
 def parameters_as_dict(parameters):
@@ -42,6 +44,15 @@ def process_args(args, defaults, description):
     description - a string to display at the top of the help message.
     """
     parser = argparse.ArgumentParser(description=description)
+
+    parser.add_argument('--mongo_host', dest="mongo_host",
+                        default='localhost',
+                        help='mongodb host'
+                        '(default localhost)')
+   
+    parser.add_argument('--mongo_port', dest="mongo_port",
+                        type=int, default=27017,
+                        help=('mongodb port'))
     parser.add_argument('-r', '--rom', dest="rom", default=defaults.ROM,
                         help='ROM to run (default: %(default)s)')
     parser.add_argument('-e', '--epochs', dest="epochs", type=int,
@@ -286,11 +297,25 @@ def launch(args, defaults, description):
                                          parameters.update_rule,
                                          parameters.batch_accumulator,
                                          rng)
+        with open(os.path.join(save_path,'net.pkl'),'w') as f:
+            cPickle.dump(network,f)
     else:
         handle = open(parameters.nn_file, 'r')
         network = cPickle.load(handle)
+        
+    client = pymongo.MongoClient(host = parameters.mongo_host,
+                                 port = parameters.mongo_port)
+                                 
+    db_names = client.database_names()
+    if parameters.experiment_prefix not in db_names:
+        create_db(parameters.experiment_prefix,
+                  host = parameters.mongo_host,
+                  port = parameters.mongo_port)
+    
+    db = client[parameters.experiment_prefix]    
 
-    agent = ale_agent.NeuralAgent(network,
+    agent = ale_agent.NeuralAgent(db,
+                                  network,
                                   parameters.epsilon_start,
                                   parameters.epsilon_min,
                                   parameters.epsilon_decay,

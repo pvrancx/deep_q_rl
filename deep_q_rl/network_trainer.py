@@ -32,7 +32,7 @@ class NetworkTrainer(object):
         self.start_time = time.time()
         while True:
             #check if we have enough samples in the db
-            if len(self._data) < self.min_samples:
+            if len(self.dataset) < self.min_samples:
                 time.sleep(1) #wait for more samples
                 logging.debug('waiting for training samples')
             else:

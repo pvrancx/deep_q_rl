@@ -17,7 +17,8 @@ def create_db(exp_name,host='localhost',port=27017):
     d_collection.create_index([("ep_id", pymongo.ASCENDING),
                                ("step_id", pymongo.ASCENDING)], 
                             unique= True)
-    d_collection.create_index("timestamp", expireAfterSeconds=30*60) 
+    d_collection.create_index("timestamp", expireAfterSeconds=20*60) 
+    client.close()
     
     
 if __name__ == '__main__':
