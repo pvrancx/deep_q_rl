@@ -45,7 +45,7 @@ class NetworkTrainer(object):
                 if self.n_batches % self.update_freq ==0:
                     logging.debug('pushing new params to db')
                     self.param_server.add_params(self.network.get_params(),
-                                                 loss)
+                                                 loss, self.n_batches)
                                                  
                 if self.n_batches % 5000:
                     dt = time.time()-self.start_time

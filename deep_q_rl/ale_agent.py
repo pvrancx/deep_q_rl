@@ -44,6 +44,7 @@ class NeuralAgent(object):
         self.save_path = save_path
         self.profile = profile
 
+
         self.phi_length = self.network.num_frames
         self.image_width = self.network.input_width
         self.image_height = self.network.input_height
@@ -107,7 +108,8 @@ class NeuralAgent(object):
         logging.info("OPENING " + self.exp_dir + '/results.csv')
         self.results_file = open(self.exp_dir + '/results.csv', 'w', 0)
         self.results_file.write(\
-            'epoch,num_episodes,total_reward,reward_per_episode,mean_q\n')
+            'epoch,num_episodes,num_updates,\
+            total_reward,reward_per_episode,mean_q\n')
         self.results_file.flush()
 
     def _open_learning_file(self):
@@ -116,9 +118,11 @@ class NeuralAgent(object):
         self.learning_file.flush()
 
     def _update_results_file(self, epoch, num_episodes, holdout_sum):
-        out = "{},{},{},{},{}\n".format(epoch, num_episodes, self.total_reward,
-                                        self.total_reward / float(num_episodes),
-                                        holdout_sum)
+        out = "{},{},{},{},{},{}\n".format(epoch, num_episodes,
+                                            self.batch_counter,
+                                            self.total_reward,
+                                            self.total_reward / float(num_episodes),
+                                            holdout_sum)
         self.results_file.write(out)
         self.results_file.flush()
 
@@ -206,7 +210,7 @@ class NeuralAgent(object):
 
                 if self.step_counter % self.update_frequency == 0:
                     loss = self._do_training()
-                    self.batch_counter += 1
+                    #self.batch_counter += 1
                     self.loss_averages.append(loss)
 
             else: # Still gathering initial random data...
@@ -248,8 +252,9 @@ class NeuralAgent(object):
         May be overridden if a subclass needs to train the network
         differently.
         """
-        params,loss =self.param_server.get_params()
+        params,loss,n_updates =self.param_server.get_params()
         self.network.set_params(params)
+        self.batch_counter = n_updates
         return loss
 
 
