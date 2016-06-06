@@ -306,9 +306,7 @@ def launch(args, defaults, description):
     client = pymongo.MongoClient(host = parameters.mongo_host,
                                  port = parameters.mongo_port)
                                  
-    db_names = client.database_names()
-    if parameters.experiment_prefix not in db_names:
-        create_db(parameters.experiment_prefix,
+    create_db(parameters.experiment_prefix,
                   host = parameters.mongo_host,
                   port = parameters.mongo_port)
     

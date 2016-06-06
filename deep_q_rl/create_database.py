@@ -10,24 +10,24 @@ import pymongo
 def create_db(exp_name,size=1000000, host='localhost',port=27017):
     client = pymongo.MongoClient(host, port)
     db = client[exp_name]
+    db.params.drop()
+    db.training_data.drop()
     
     db.create_collection(
-        'trainingdata', 
+        'training_data', 
         capped=True, 
-        size=50*2**20,#50G
+        size=50*2**30,#50G
         max = size,
-        autoIndexId=True)
+        autoIndexId=False)
     
     db.create_collection(
         'params', 
         capped=True, 
-        size=2*2**20, #2G
+        size=2*2**30, #2G
         max = 100,
-        autoIndexId=True)
+        autoIndexId=False)
     p_collection = db['params']
     d_collection = db['training_data']
-    d_collection.remove({})
-    p_collection.remove({})
     d_collection.create_index([("ep_id", pymongo.ASCENDING),
                                ("step_id", pymongo.ASCENDING)], 
                             unique= True)

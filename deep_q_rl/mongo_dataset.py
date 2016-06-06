@@ -22,7 +22,7 @@ class MongoDataset(object):
                  obs_type = np.float, act_type = np.float):
         self._db = db
         self._collection = self._db[exp_name]
-        self._collection.remove({})
+#        self._collection.remove({})
         self.hist_len = hist_len
         self.act_shape = act_shape
         self.obs_shape = obs_shape
@@ -66,12 +66,9 @@ class MongoDataset(object):
         return phi
         
     def random_batch(self, batch_size):
-        count = 0
         assert batch_size < self._collection.count(), 'too few samples in db'
-        while count< batch_size:
-            result = self._collection.aggregate([{'$sample': 
+        result = self._collection.aggregate([{'$sample': 
                                                 {'size': batch_size }}])
-            count = result.count()
             
         phis = np.zeros((batch_size,self.hist_len)+self.obs_shape,
                        dtype= self.obs_type)
