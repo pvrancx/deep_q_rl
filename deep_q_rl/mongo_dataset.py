@@ -69,8 +69,8 @@ class MongoDataset(object):
         count = 0
         assert batch_size < self._collection.count(), 'too few samples in db'
         while count< batch_size:
-            query = {"r_idx": {"$lte": np.random.rand()},"terminal": False}
-            result = self._collection.find(query).sort('r_idx').limit(batch_size)
+            result = self._collection.aggregate([{'$sample': 
+                                                {'size': batch_size }}])
             count = result.count()
             
         phis = np.zeros((batch_size,self.hist_len)+self.obs_shape,
@@ -115,14 +115,6 @@ class MongoDataset(object):
                 if t_idx == 1:
                     acts[batch_idx,] = st['action']
                     rewards[batch_idx] = st['reward']
-                    
-            self._collection.update_one({
-                '_id': ObjectId(r['_id'])
-                },{
-                '$set': {
-                'r_idx': np.random.rand()
-                }
-                }, upsert=False)
                     
         
         return (phis,acts,rewards,phis_next,term)
