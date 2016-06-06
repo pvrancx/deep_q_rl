@@ -16,7 +16,7 @@ def create_db(exp_name,size=1000000, host='localhost',port=27017):
     db.create_collection(
         'training_data', 
         capped=True, 
-        size=50*2**30,#50G
+        size=50*2**30, #50G
         max = size,
         autoIndexId=False)
     
@@ -25,13 +25,13 @@ def create_db(exp_name,size=1000000, host='localhost',port=27017):
         capped=True, 
         size=2*2**30, #2G
         max = 100,
-        autoIndexId=False)
+        autoIndexId=True)
     p_collection = db['params']
     d_collection = db['training_data']
     d_collection.create_index([("ep_id", pymongo.ASCENDING),
                                ("step_id", pymongo.ASCENDING)], 
                             unique= True)
-    d_collection.create_index("timestamp", expireAfterSeconds=20*60) 
+    #d_collection.create_index("timestamp", expireAfterSeconds=60*60) 
     client.close()
     
     

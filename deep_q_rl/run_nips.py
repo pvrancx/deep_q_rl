@@ -16,7 +16,7 @@ class Defaults:
     # Experiment Parameters
     # ----------------------
     STEPS_PER_EPOCH = 50000
-    EPOCHS = 100
+    EPOCHS = 1000
     STEPS_PER_TEST = 10000
     PROGRESS_FREQUENCY = 5000
 
@@ -44,7 +44,7 @@ class Defaults:
     EPSILON_MIN = .1
     EPSILON_DECAY = 1000000
     PHI_LENGTH = 4
-    UPDATE_FREQUENCY = 1            # Perform training every step
+    UPDATE_FREQUENCY = 20            # Perform training every step
     REPLAY_MEMORY_SIZE = 1000000
     BATCH_SIZE = 32
     NETWORK_TYPE = "nips_cpu"

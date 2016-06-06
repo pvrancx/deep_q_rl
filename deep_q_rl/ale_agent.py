@@ -12,6 +12,7 @@ adapted by Peter vrancx
 import cPickle
 import time
 import logging
+import uuid
 
 import pymongo
 from mongo_dataset import MongoDataset
@@ -92,7 +93,7 @@ class NeuralAgent(object):
 
         self.holdout_data = None
 
-        self.agent_id = 0
+        self.agent_id = str(uuid.uuid4())
 
         # In order to add an element to the data set we need the
         # previous state and action and the current reward.  These
@@ -108,8 +109,7 @@ class NeuralAgent(object):
         logging.info("OPENING " + self.exp_dir + '/results.csv')
         self.results_file = open(self.exp_dir + '/results.csv', 'w', 0)
         self.results_file.write(\
-            'epoch,num_episodes,num_updates,\
-            total_reward,reward_per_episode,mean_q\n')
+            'epoch,num_episodes,num_updates,total_reward,reward_per_episode,mean_q\n')
         self.results_file.flush()
 
     def _open_learning_file(self):
@@ -146,7 +146,6 @@ class NeuralAgent(object):
         """
 
         self.step_counter = 0
-        self.batch_counter = 0
         self.episode_reward = 0
         self.episode_counter += 1
 
@@ -252,7 +251,7 @@ class NeuralAgent(object):
         May be overridden if a subclass needs to train the network
         differently.
         """
-        params,loss,n_updates =self.param_server.get_params()
+	params,loss,n_updates =self.param_server.get_params()
         self.network.set_params(params)
         self.batch_counter = n_updates
         return loss

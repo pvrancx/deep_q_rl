@@ -29,6 +29,6 @@ class ParameterServer(object):
     def get_params(self):
         if self._param_collection.count() < 1:
             return None
-        p = self._param_collection.find(limit=1,sort=[('$natural', -1)]).next()
+        p = self._param_collection.find().sort('$natural', -1).limit(1).next()
         return (pickle.loads(p['params']),p['loss'],p['updates'])
         
