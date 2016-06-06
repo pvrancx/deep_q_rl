@@ -21,7 +21,7 @@ class ParameterServer(object):
         self._param_collection.insert_one(
             {'params': Binary( pickle.dumps(params) ), 
             'loss': loss,
-            'updates:' updates
+            'updates': updates
             }
         )
         
