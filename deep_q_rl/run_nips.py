@@ -21,13 +21,10 @@ class Defaults:
     PROGRESS_FREQUENCY = 5000
 
     # ----------------------
-    # ALE Parameters
+    # ENVIRONMENT Parameters
     # ----------------------
-    BASE_ROM_PATH = "../roms/"
-    ROM = 'breakout.bin'
-    FRAME_SKIP = 4
-    REPEAT_ACTION_PROBABILITY = 0
-    COLOR_AVERAGING = True
+    ENV = 'Breakout-v0'
+
 
     # ----------------------
     # Agent/Network parameters:

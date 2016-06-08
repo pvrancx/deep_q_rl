@@ -45,7 +45,7 @@ class MongoDataset(object):
             'action': action,
             'reward': reward,
             'terminal': terminal,
-            'agent': agent_id,
+            'agent_id': agent_id,
             'ep_id':ep_id,
             'step_id':step_id,
             'r_idx': np.random.rand(),
@@ -82,7 +82,9 @@ class MongoDataset(object):
             #steps needed to make transition
             #phis is obs[i:i+hist_len], phi_next is obs[i+1,i+hist_len+1]
             steps = range(r['step_id']-self.hist_len+1,r['step_id']+2)
-            query = {'ep_id': r['ep_id'],'step_id': {'$in': steps}}
+            query = {'agent_id': r['agent_id'],
+                     'ep_id': r['ep_id'],
+                     'step_id': {'$in': steps}}
             trans = self._collection.find(query).sort('step_id',-1)
 
             #go through steps in descending order

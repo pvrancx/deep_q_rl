@@ -8,17 +8,18 @@ import os
 import time
 import argparse
 import logging
-import ale_python_interface
 import cPickle
 import numpy as np
 import theano
 import simplejson as json
+import gym 
 
-import ale_experiment
+import experiment
 import ale_agent
 import q_network
 import profile
 import pymongo
+from ale_utils import ALEPreProcessor
 from create_database import create_db
 
 
@@ -53,8 +54,8 @@ def process_args(args, defaults, description):
     parser.add_argument('--mongo_port', dest="mongo_port",
                         type=int, default=27017,
                         help=('mongodb port'))
-    parser.add_argument('-r', '--rom', dest="rom", default=defaults.ROM,
-                        help='ROM to run (default: %(default)s)')
+    parser.add_argument('--env', dest="environment", default=defaults.ENV,
+                        help='Problem to run (default: %(default)s)')
     parser.add_argument('-e', '--epochs', dest="epochs", type=int,
                         default=defaults.EPOCHS,
                         help='Number of training epochs (default: %(default)s)')
@@ -67,19 +68,13 @@ def process_args(args, defaults, description):
     parser.add_argument('--display-screen', dest="display_screen",
                         action='store_true', default=False,
                         help='Show the game screen.')
+    parser.add_argument('--preprocess', dest="preprocess",
+                        action='store_true', default=True,
+                        help='preprocess observations')
     parser.add_argument('--experiment-prefix', dest="experiment_prefix",
                         default=None,
                         help='Experiment name prefix '
                         '(default is the name of the game)')
-    parser.add_argument('--frame-skip', dest="frame_skip",
-                        default=defaults.FRAME_SKIP, type=int,
-                        help='Every how many frames to process '
-                        '(default: %(default)s)')
-    parser.add_argument('--repeat-action-probability',
-                        dest="repeat_action_probability",
-                        default=defaults.REPEAT_ACTION_PROBABILITY, type=float,
-                        help=('Probability that action choice will be ' +
-                              'ignored (default: %(default)s)'))
 
     parser.add_argument('--update-rule', dest="update_rule",
                         type=str, default=defaults.UPDATE_RULE,
@@ -153,10 +148,7 @@ def process_args(args, defaults, description):
     parser.add_argument('--death-ends-episode', dest="death_ends_episode",
                         type=str, default=defaults.DEATH_ENDS_EPISODE,
                         help=('true|false (default: %(default)s)'))
-    parser.add_argument('--max-start-nullops', dest="max_start_nullops",
-                        type=int, default=defaults.MAX_START_NULLOPS,
-                        help=('Maximum number of null-ops at the start ' +
-                              'of games. (default: %(default)s)'))
+
     parser.add_argument('--deterministic', dest="deterministic",
                         type=bool, default=defaults.DETERMINISTIC,
                         help=('Whether to use deterministic parameters ' +
@@ -165,10 +157,7 @@ def process_args(args, defaults, description):
                         type=bool, default=defaults.CUDNN_DETERMINISTIC,
                         help=('Whether to use deterministic backprop. ' +
                               '(default: %(default)s)'))
-    parser.add_argument('--color_averaging', dest="color_averaging",
-                        type=bool, default=defaults.COLOR_AVERAGING,
-                        help=('Whether to use ALE color averaging. ' +
-                              '(default: %(default)s)'))
+
     parser.add_argument('--log_level', dest="log_level",
                         type=str, default=logging.INFO,
                         help=('Log level to terminal. ' +
@@ -183,8 +172,7 @@ def process_args(args, defaults, description):
 
     parameters = parser.parse_args(args)
     if parameters.experiment_prefix is None:
-        name = os.path.splitext(os.path.basename(parameters.rom))[0]
-        parameters.experiment_prefix = name
+        parameters.experiment_prefix = parameters.environment
 
     if parameters.death_ends_episode == 'true':
         parameters.death_ends_episode = True
@@ -244,11 +232,6 @@ def launch(args, defaults, description):
     if parameters.profile:
         profile.configure_theano_for_profiling(save_path)
 
-    if parameters.rom.endswith('.bin'):
-        rom = parameters.rom
-    else:
-        rom = "%s.bin" % parameters.rom
-    full_rom_path = os.path.join(defaults.BASE_ROM_PATH, rom)
 
     if parameters.deterministic:
         rng = np.random.RandomState(123456)
@@ -259,26 +242,20 @@ def launch(args, defaults, description):
         theano.config.dnn.conv.algo_bwd = 'deterministic'
 
 
-    ale = ale_python_interface.ALEInterface()
-    ale.setInt('random_seed', rng.randint(1000))
 
     # TODO make it display 
     if parameters.display_screen:
-        import sys
-        if sys.platform == 'darwin':
-            import pygame
-            pygame.init()
-            ale.setBool('sound', False) # Sound doesn't work on OSX
+        pass
 
-    ale.setBool('display_screen', parameters.display_screen)
-    ale.setFloat('repeat_action_probability',
-                 parameters.repeat_action_probability)
-    ale.setInt('frame_skip', parameters.frame_skip)
-    ale.setBool('color_averaging', parameters.color_averaging)
-
-    ale.loadROM(full_rom_path)
-
-    num_actions = len(ale.getMinimalActionSet())
+    env = gym.make(parameters.environment)
+    num_actions = env.action_space.n
+    
+    if parameters.preprocess:
+        preprocessor = ALEPreProcessor(defaults.RESIZED_WIDTH,
+                                              defaults.RESIZED_HEIGHT,
+                                              parameters.resize_method,)
+    else:
+        preprocessor = None
 
     if parameters.nn_file is None:
         network = q_network.DeepQLearner(defaults.RESIZED_WIDTH,
@@ -311,6 +288,7 @@ def launch(args, defaults, description):
                   port = parameters.mongo_port)
     
     db = client[parameters.experiment_prefix]    
+    
 
     agent = ale_agent.NeuralAgent(db,
                                   network,
@@ -323,20 +301,16 @@ def launch(args, defaults, description):
                                   rng, save_path, 
                                   parameters.profile)
 
-    experiment = ale_experiment.ALEExperiment(ale, agent,
-                                              defaults.RESIZED_WIDTH,
-                                              defaults.RESIZED_HEIGHT,
-                                              parameters.resize_method,
+    env = gym.make(parameters.environment)
+    exp = experiment.GymExperiment(env, agent,preprocessor,
                                               parameters.epochs,
                                               parameters.steps_per_epoch,
                                               parameters.steps_per_test,
-                                              parameters.death_ends_episode,
-                                              parameters.max_start_nullops,
                                               rng,
                                               parameters.progress_frequency)
 
 
-    experiment.run()
+    exp.run()
 
 
 
