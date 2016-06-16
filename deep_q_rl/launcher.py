@@ -15,10 +15,12 @@ import simplejson as json
 import gym 
 
 import experiment
-import ale_agent
+import dqn_agent
 import q_network
 import profile
+import tabular_dataset
 import pymongo
+import network_handler
 from ale_utils import ALEPreProcessor
 from create_database import create_db
 
@@ -256,10 +258,23 @@ def launch(args, defaults, description):
                                               parameters.resize_method,)
     else:
         preprocessor = None
+        
+        
+    if preprocessor is None:
+        obs_space = env.observation_space
+        if isinstance(obs_space,gym.spaces.Box):   
+            obs_shape = obs_space.high.shape
+        elif isinstance(obs_space,gym.spaces.Discrete):
+            obs_shape = (1,)
+        else:
+            #TODO: handle tuple spaces
+            raise RuntimeError('observation space not supported')
+        
+    else:
+        obs_shape = preprocessor.output_shape
 
     if parameters.nn_file is None:
-        network = q_network.DeepQLearner(defaults.RESIZED_WIDTH,
-                                         defaults.RESIZED_HEIGHT,
+        network = q_network.DeepQLearner(obs_shape,
                                          num_actions,
                                          parameters.phi_length,
                                          parameters.discount,
@@ -280,28 +295,44 @@ def launch(args, defaults, description):
         handle = open(parameters.nn_file, 'r')
         network = cPickle.load(handle)
         
-    client = pymongo.MongoClient(host = parameters.mongo_host,
-                                 port = parameters.mongo_port)
+   # client = pymongo.MongoClient(host = parameters.mongo_host,
+   #                              port = parameters.mongo_port)
                                  
-    create_db(parameters.experiment_prefix,
-                  host = parameters.mongo_host,
-                  port = parameters.mongo_port)
+   # create_db(parameters.experiment_prefix,
+   #               host = parameters.mongo_host,
+   #               port = parameters.mongo_port)
     
-    db = client[parameters.experiment_prefix]    
+  #  db = client[parameters.experiment_prefix]    
     
+    env = gym.make(parameters.environment)
 
-    agent = ale_agent.NeuralAgent(db,
-                                  network,
+    
+    training_dataset = tabular_dataset.DataSet(rng,obs_shape,
+                                      obs_type='uint8',
+                                      act_type='uint8',
+                                      max_steps=parameters.replay_memory_size, 
+                                      phi_length=parameters.phi_length)
+                                      
+    test_dataset = tabular_dataset.DataSet(rng, obs_shape,
+                                      obs_type='uint8',
+                                      act_type='uint8',
+                                      max_steps=1000, 
+                                      phi_length=parameters.phi_length)
+
+    agent = dqn_agent.NeuralAgent(training_dataset,
+                                  test_dataset,
+                                  network_handler.NetworkHandler(
+                                      network,
+                                      training_dataset
+                                      ),
                                   parameters.epsilon_start,
                                   parameters.epsilon_min,
                                   parameters.epsilon_decay,
-                                  parameters.replay_memory_size,
                                   parameters.replay_start_size,
                                   parameters.update_frequency,
                                   rng, save_path, 
                                   parameters.profile)
 
-    env = gym.make(parameters.environment)
     exp = experiment.GymExperiment(env, agent,preprocessor,
                                               parameters.epochs,
                                               parameters.steps_per_epoch,

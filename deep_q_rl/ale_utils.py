@@ -14,6 +14,7 @@ class ALEPreProcessor(object):
         self.resized_height = resized_height
         self.resize_method = resize_method
         self.width, self.height = 160,210
+        self.output_shape = (resized_width,resized_height)
 
 
     def get_observation(self,obs):

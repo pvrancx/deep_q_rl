@@ -16,7 +16,6 @@ import uuid
 
 import pymongo
 from mongo_dataset import MongoDataset
-from param_server import ParameterServer
 
 
 import numpy as np
@@ -30,15 +29,15 @@ sys.setrecursionlimit(10000)
 
 class NeuralAgent(object):
 
-    def __init__(self, db, q_network, epsilon_start, epsilon_min,
-                 epsilon_decay, replay_memory_size, replay_start_size, 
+    def __init__(self, training_dataset, test_dataset, net_handler, 
+                 epsilon_start, epsilon_min,
+                 epsilon_decay, replay_start_size, 
                  update_frequency, rng, save_path, profile):
 
-        self.network = q_network
+        self.network = net_handler
         self.epsilon_start = epsilon_start
         self.epsilon_min = epsilon_min
         self.epsilon_decay = epsilon_decay
-        self.replay_memory_size = replay_memory_size
         self.replay_start_size = replay_start_size
         self.update_frequency = update_frequency
         self.rng = rng
@@ -46,34 +45,38 @@ class NeuralAgent(object):
         self.profile = profile
 
 
-        self.phi_length = self.network.num_frames
-        self.image_width = self.network.input_width
-        self.image_height = self.network.input_height
+
 
         self.exp_dir = save_path
-        self.num_actions = self.network.num_actions
+        self.num_actions = self.network._network.num_actions
         logging.info("Creating data sets")
 
-        self.data_set = MongoDataset(db,'training_data',
-                         obs_shape=(self.image_width,
-                                    self.image_height),
-                         act_shape = (1,),
-                        hist_len = self.phi_length,
-                        act_type='int32'
-                        )
+        self.dataset = training_dataset
+        self.test_dataset = test_dataset
+
+        self.phi_length = self.dataset.phi_length
+
+        
+        #MongoDataset(db,'training_data',
+        #                 obs_shape=(self.image_width,
+#                                    self.image_height),
+#                         act_shape = (1,),
+#                        hist_len = self.phi_length,
+#                        act_type='int32'
+#                        )
 
 
         # just needs to be big enough to create phi's
-        self.test_data_set = MongoDataset(db,'test_data',
-                         obs_shape=(self.image_width,
-                                    self.image_height),
-                         act_shape = (1,),
-                        hist_len = self.phi_length,
-                        act_type='int32'
-                        )
-        
-        self.param_server = ParameterServer(db,'params')
-        self.param_server.add_params(self.network.get_params())
+#        MongoDataset(db,'test_data',
+#                         obs_shape=(self.image_width,
+#                                    self.image_height),
+#                         act_shape = (1,),
+#                        hist_len = self.phi_length,
+#                        act_type='int32'
+#                        )
+#        
+       # self.param_server = ParameterServer(db,'params')
+       # self.param_server.add_params(self.network.get_params())
                         
         logging.info("Finished creating data sets")
         self.epsilon = self.epsilon_start
@@ -119,7 +122,7 @@ class NeuralAgent(object):
 
     def _update_results_file(self, epoch, num_episodes, holdout_sum):
         out = "{},{},{},{},{},{}\n".format(epoch, num_episodes,
-                                            self.batch_counter,
+                                            self.network.batch_counter,
                                             self.total_reward,
                                             self.total_reward / float(num_episodes),
                                             holdout_sum)
@@ -193,17 +196,17 @@ class NeuralAgent(object):
         #TESTING---------------------------
         if self.testing:
             self.episode_reward += reward
-            action = self._choose_action(self.test_data_set, .05,
+            action = self._choose_action(self.test_dataset, .05,
                                          observation, np.clip(reward, -1, 1))
 
         #NOT TESTING---------------------------
         else:
 
-            if len(self.data_set) > self.replay_start_size:
+            if len(self.dataset) > self.replay_start_size:
                 self.epsilon = max(self.epsilon_min,
                                    self.epsilon - self.epsilon_rate)
 
-                action = self._choose_action(self.data_set, self.epsilon,
+                action = self._choose_action(self.dataset, self.epsilon,
                                              observation,
                                              np.clip(reward, -1, 1))
 
@@ -213,7 +216,7 @@ class NeuralAgent(object):
                     self.loss_averages.append(loss)
 
             else: # Still gathering initial random data...
-                action = self._choose_action(self.data_set, self.epsilon,
+                action = self._choose_action(self.dataset, self.epsilon,
                                              observation,
                                              np.clip(reward, -1, 1))
 
@@ -251,9 +254,8 @@ class NeuralAgent(object):
         May be overridden if a subclass needs to train the network
         differently.
         """
-	params,loss,n_updates =self.param_server.get_params()
-        self.network.set_params(params)
-        self.batch_counter = n_updates
+        loss = self.network.train()
+
         return loss
 
 
@@ -281,7 +283,7 @@ class NeuralAgent(object):
                 self.total_reward += self.episode_reward
         else:
             # Store the latest sample.
-            self.data_set.add_sample(self.last_img,
+            self.dataset.add_sample(self.last_img,
                                      self.last_action,
                                      np.clip(reward, -1, 1),
                                      True,
@@ -328,8 +330,8 @@ class NeuralAgent(object):
 
         # TODO check out holdout size in original code
         # Keep a random subset of transitions to evaluate performance over time
-        if self.holdout_data is None and len(self.data_set) > holdout_size:
-            self.holdout_data = self.data_set.random_batch(holdout_size)[0]
+        if self.holdout_data is None and len(self.dataset) > holdout_size:
+            self.holdout_data = self.dataset.random_batch(holdout_size)[0]
 
         holdout_sum = 0
         if self.holdout_data is not None:

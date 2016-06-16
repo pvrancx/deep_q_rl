@@ -12,7 +12,7 @@ class DataSet(object):
     """A replay memory consisting of circular buffers for observed images,
     actions, and rewards.
     """
-    def __init__(self, rng, obs_space,obs_type=floatX,act_type='uint8',
+    def __init__(self, rng, obs_shape,obs_type=floatX,act_type='uint8',
                  max_steps=1000, phi_length=4):
         """Construct a DataSet.
 
@@ -26,13 +26,7 @@ class DataSet(object):
         # number of saved time steps.
 
         # Store arguments.
-        if isinstance(obs_space,gym.spaces.Box):   
-            self.obs_shape = obs_space.high.shape
-        elif isinstance(obs_space,gym.spaces.Discrete):
-            self.obs_shape = (1,)
-        else:
-            raise RuntimeError('observation space not supported')
-        #TODO: handle tuple spaces
+        self.obs_shape = obs_shape
         self.obs_type = obs_type
         self.act_type = act_type
  
@@ -50,7 +44,7 @@ class DataSet(object):
         self.top = 0    # Points to free index
         self.size = 0
 
-    def add_sample(self, img, action, reward, terminal):
+    def add_sample(self, img, action, reward, terminal,episode,step,agent):
         """Add a time step record.
 
         Arguments:

@@ -27,14 +27,13 @@ class DeepQLearner:
     Deep Q-learning network using Lasagne.
     """
 
-    def __init__(self, input_width, input_height, num_actions,
+    def __init__(self, input_shape, num_actions,
                  num_frames, discount, learning_rate, rho,
                  rms_epsilon, momentum, clip_delta, freeze_interval,
                  batch_size, network_type, update_rule,
                  batch_accumulator, rng, input_scale=255.0):
 
-        self.input_width = input_width
-        self.input_height = input_height
+        self.input_shape = input_shape
         self.num_actions = num_actions
         self.num_frames = num_frames
         self.batch_size = batch_size
@@ -51,12 +50,12 @@ class DeepQLearner:
 
         self.update_counter = 0
 
-        self.l_out = self.build_network(network_type, input_width, input_height,
+        self.l_out = self.build_network(network_type, input_shape,
                                         num_actions, num_frames, batch_size)
         # theano.compile.function_dump('network.dump', self.l_out)
         if self.freeze_interval > 0:
-            self.next_l_out = self.build_network(network_type, input_width,
-                                                 input_height, num_actions,
+            self.next_l_out = self.build_network(network_type, input_shape, 
+                                                 num_actions,
                                                  num_frames, batch_size)
             self.reset_q_hat()
 
@@ -67,11 +66,11 @@ class DeepQLearner:
         terminals = T.icol('terminals')
 
         self.states_shared = theano.shared(
-            np.zeros((batch_size, num_frames, input_height, input_width),
+            np.zeros((batch_size, num_frames)+ input_shape,
                      dtype=theano.config.floatX))
 
         self.next_states_shared = theano.shared(
-            np.zeros((batch_size, num_frames, input_height, input_width),
+            np.zeros((batch_size, num_frames)+ input_shape,
                      dtype=theano.config.floatX))
 
         self.rewards_shared = theano.shared(
@@ -153,7 +152,7 @@ class DeepQLearner:
         self._q_vals = theano.function([], q_vals,
                                        givens={states: self.states_shared})
 
-    def build_network(self, network_type, input_width, input_height,
+    def build_network(self, network_type, input_shape,
                       output_dim, num_frames, batch_size):
         if (network_type.endswith('cuda') or network_type.endswith('cudnn')) and \
                 not theano.config.device.startswith("gpu"):
@@ -165,33 +164,33 @@ class DeepQLearner:
             network_type = cpu_version
 
         if network_type == "nature_cuda":
-            return self.build_nature_network_cuda(input_width, input_height,
+            return self.build_nature_network_cuda(input_shape,
                                              output_dim, num_frames, batch_size)
         # Requires cuDNN which is not freely available. 
         if network_type == "nature_cudnn":
-            return self.build_nature_network_dnn(input_width, input_height,
+            return self.build_nature_network_dnn(input_shape,
                                                  output_dim, num_frames,
                                                  batch_size)
         if network_type == "nature_cpu":
-            return self.build_nature_network_cpu(input_width, input_height,
+            return self.build_nature_network_cpu(input_shape,
                                                  output_dim, num_frames,
                                                  batch_size)
         if network_type == "nips_cuda":
-            return self.build_nips_network_cuda(input_width, input_height,
+            return self.build_nips_network_cuda(input_shape,
                                            output_dim, num_frames, batch_size)
         # Requires cuDNN which is not freely available. 
         if network_type == "nips_cudnn":
-            return self.build_nips_network_dnn(input_width, input_height,
+            return self.build_nips_network_dnn(input_shape,
                                                output_dim, num_frames,
                                                batch_size)
         if network_type == "nips_cpu":
-            return self.build_nips_network_cpu(input_width, input_height,
+            return self.build_nips_network_cpu(input_shape,
                                            output_dim, num_frames, batch_size)
         if network_type == "linear":
-            return self.build_linear_network(input_width, input_height,
+            return self.build_linear_network(input_shape,
                                              output_dim, num_frames, batch_size)
         if network_type == "attempt1_cpu":
-            return self.build_attempt1_cpu(input_width, input_height,
+            return self.build_attempt1_cpu(input_shape,
                                                  output_dim, num_frames,
                                                  batch_size)
         else:
@@ -228,8 +227,8 @@ class DeepQLearner:
     def q_vals(self, state):
         # Might be a slightly cheaper way by reshaping the passed-in state,
         # though that would destroy the original
-        states = np.zeros((1, self.num_frames, self.input_height,
-                           self.input_width), dtype=theano.config.floatX)
+        states = np.zeros((1, self.num_frames)+self.input_shape, 
+                          dtype=theano.config.floatX)
         states[0, ...] = state
         self.states_shared.set_value(states)
         return self._q_vals()[0]
@@ -251,34 +250,34 @@ class DeepQLearner:
         all_params = lasagne.layers.helper.get_all_param_values(self.l_out)
         lasagne.layers.helper.set_all_param_values(self.next_l_out, all_params)
 
-    def build_nature_network_cuda(self, input_width, input_height, output_dim,
+    def build_nature_network_cuda(self, input_shape, output_dim,
                                   num_frames, batch_size):
         from lasagne.layers import cuda_convnet
         conv_layer = cuda_convnet.Conv2DCCLayer
-        return self.build_nature_network(input_width, input_height, output_dim,
+        return self.build_nature_network(input_shape, output_dim,
                              num_frames, batch_size, conv_layer)
 
-    def build_nature_network_dnn(self, input_width, input_height, output_dim,
+    def build_nature_network_dnn(self, input_shape, output_dim,
                                   num_frames, batch_size):
         from lasagne.layers import dnn
         conv_layer = dnn.Conv2DDNNLayer
-        return self.build_nature_network(input_width, input_height, output_dim,
+        return self.build_nature_network(input_shape, output_dim,
                                     num_frames, batch_size, conv_layer)
 
-    def build_nature_network_cpu(self, input_width, input_height, output_dim,
+    def build_nature_network_cpu(self, input_shape, output_dim,
                                  num_frames, batch_size):
         from lasagne.layers import conv 
         conv_layer = conv.Conv2DLayer
-        return self.build_nature_network(input_width, input_height, output_dim,
+        return self.build_nature_network(input_shape, output_dim,
                                     num_frames, batch_size, conv_layer)
 
-    def build_nature_network(self, input_width, input_height, output_dim,
+    def build_nature_network(self, input_shape, output_dim,
                              num_frames, batch_size, conv_layer):
         """
         Build a large network consistent with the DeepMind Nature paper.
         """
         l_in = lasagne.layers.InputLayer(
-            shape=(batch_size, num_frames, input_width, input_height)
+            shape=(batch_size, num_frames)+ input_shape
         )
 
         l_conv1 = conv_layer(
@@ -329,14 +328,14 @@ class DeepQLearner:
 
         return l_out
 
-    def build_nips_network_cuda(self, input_width, input_height, output_dim,
+    def build_nips_network_cuda(self, input_shape, output_dim,
                                num_frames, batch_size):
         from lasagne.layers import cuda_convnet
         conv_layer = cuda_convnet.Conv2DCCLayer
-        return self.build_nips_network(input_width, input_height, output_dim,
+        return self.build_nips_network(input_shape, output_dim,
                                   num_frames, batch_size, conv_layer)
 
-    def build_nips_network_dnn(self, input_width, input_height, output_dim,
+    def build_nips_network_dnn(self, input_shape, output_dim,
                                num_frames, batch_size):
         """
         Build a network consistent with the 2013 NIPS paper.
@@ -344,23 +343,23 @@ class DeepQLearner:
         # Import it here, in case it isn't installed.
         from lasagne.layers import dnn
         conv_layer = dnn.Conv2DDNNLayer
-        return self.build_nips_network(input_width, input_height, output_dim,
+        return self.build_nips_network(input_shape, output_dim,
                                   num_frames, batch_size, conv_layer)
 
-    def build_nips_network_cpu(self, input_width, input_height, output_dim,
+    def build_nips_network_cpu(self, input_shape, output_dim,
                                num_frames, batch_size):
         from lasagne.layers import conv
         conv_layer = conv.Conv2DLayer
-        return self.build_nips_network(input_width, input_height, output_dim,
+        return self.build_nips_network(input_shape, output_dim,
                                   num_frames, batch_size, conv_layer)
 
-    def build_nips_network(self, input_width, input_height, output_dim,
+    def build_nips_network(self, input_shape, output_dim,
                            num_frames, batch_size, conv_layer):
         """
         Build a network consistent with the 2013 NIPS paper.
         """
         l_in = lasagne.layers.InputLayer(
-            shape=(None, num_frames, input_width, input_height)
+            shape=(None, num_frames)+input_shape
         )
 
         l_conv1 = conv_layer(
@@ -407,18 +406,18 @@ class DeepQLearner:
 
         return l_out
 
-    def build_attempt1_cpu(self, input_width, input_height, output_dim,
+    def build_attempt1_cpu(self, input_shape, output_dim,
                                num_frames, batch_size):
         from lasagne.layers import conv
         conv_layer = conv.Conv2DLayer
-        return self.build_attempt1(input_width, input_height, output_dim,
+        return self.build_attempt1(input_shape, output_dim,
                                   num_frames, batch_size, conv_layer)
 
-    def build_attempt1(self, input_width, input_height, output_dim,
+    def build_attempt1(self, input_shape, output_dim,
                            num_frames, batch_size, conv_layer):
         l_in = lasagne.layers.InputLayer(
             # Batch size is undefined so we can chuck in as many as we please
-            shape=(None, num_frames, input_width, input_height)
+            shape=(None, num_frames)+input_shape
         )
 
         l_conv1 = conv_layer(
@@ -491,7 +490,7 @@ class DeepQLearner:
 
         return l_out
 
-    def build_linear_network(self, input_width, input_height, output_dim,
+    def build_linear_network(self, input_shape, output_dim,
                              num_frames, batch_size):
         """
         Build a simple linear learner.  Useful for creating
@@ -499,7 +498,7 @@ class DeepQLearner:
         """
 
         l_in = lasagne.layers.InputLayer(
-            shape=(batch_size, num_frames, input_width, input_height)
+            shape=(batch_size, num_frames)+input_shape
         )
 
         l_out = lasagne.layers.DenseLayer(
