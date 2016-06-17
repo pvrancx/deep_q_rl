@@ -4,7 +4,6 @@ construct randomly selected batches of phi's from the stored history.
 
 import numpy as np
 import theano
-import gym
 
 floatX = theano.config.floatX
 
@@ -39,6 +38,17 @@ class DataSet(object):
         self.actions = np.zeros(max_steps, dtype=act_type)
         self.rewards = np.zeros(max_steps, dtype=floatX)
         self.terminal = np.zeros(max_steps, dtype='bool')
+
+        self.bottom = 0
+        self.top = 0    # Points to free index
+        self.size = 0
+        
+    def clear(self):
+        self.obs = np.zeros((self.max_steps,) + self.obs_shape, 
+                            dtype=self.obs_type)
+        self.actions = np.zeros(self.max_steps, dtype=self.act_type)
+        self.rewards = np.zeros(self.max_steps, dtype=floatX)
+        self.terminal = np.zeros(self.max_steps, dtype='bool')
 
         self.bottom = 0
         self.top = 0    # Points to free index
@@ -90,9 +100,10 @@ class DataSet(object):
         phi[-1] = img
         return phi
 
-    def random_batch(self, batch_size):
+    def get_batch(self, batch_size,random=True):
         """Return corresponding states, actions, rewards, terminal status, and
-next_states for batch_size randomly chosen state transitions.
+next_states for batch_size  state transitions. If random = True transitions are
+chosen randomely, otherwise last batch_size transitions are used
 
         """
         # Allocate the response.
@@ -107,9 +118,11 @@ next_states for batch_size randomly chosen state transitions.
                                dtype=self.obs_type)
 
         count = 0
+        index = (self.bottom + self.size - self.phi_length-1)
         while count < batch_size:
             # Randomly choose a time step from the replay memory.
-            index = self.rng.randint(self.bottom,
+            if random:
+                index = self.rng.randint(self.bottom,
                                      self.bottom + self.size - self.phi_length)
 
             initial_indices = np.arange(index, index + self.phi_length)
@@ -124,6 +137,7 @@ next_states for batch_size randomly chosen state transitions.
             # the Q learner recognizes and handles correctly during
             # training by zeroing the discounted future reward estimate.
             if np.any(self.terminal.take(initial_indices[0:-1], mode='wrap')):
+                index -= 1
                 continue
 
             # Add the state transition to the response.
@@ -135,6 +149,7 @@ next_states for batch_size randomly chosen state transitions.
                                                 axis=0,
                                                 mode='wrap')
             count += 1
+            index -=1
 
         return states, actions, rewards, next_states, terminal
 

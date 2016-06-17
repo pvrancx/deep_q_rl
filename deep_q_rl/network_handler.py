@@ -4,7 +4,7 @@ Created on Wed Jun 15 12:50:32 2016
 
 @author: pvrancx
 """
-
+import multiprocessing
 class NetworkHandler(object):
     
     def __init__(self,network,dataset=None,batch_size = 32):
@@ -23,7 +23,7 @@ class NetworkHandler(object):
     Samples data and performs 1 training step of the local network.
     '''
     def train(self):
-        S,A,R,Sp,T = self._dataset.random_batch(self.batch_size)
+        S,A,R,Sp,T = self._dataset.get_batch(self.batch_size,random=True)
         loss = self._network.train(S,A,R,Sp,T)
         self.batch_counter += 1
         return loss
@@ -31,8 +31,9 @@ class NetworkHandler(object):
     
 class RemoteNetworkHandler(NetworkHandler):
     def __init__(self,network,param_server,**kwargs):
-        super.__init__(self,network,**kwargs) 
+        super(RemoteNetworkHandler,self).__init__(network,**kwargs) 
         self.param_server = param_server
+        self.param_server.add_params(self._network.get_params())
         
     '''
     Simply retrieves latest network network from server.
@@ -47,18 +48,24 @@ class RemoteNetworkHandler(NetworkHandler):
         
 class AsyncNetworkHandler(NetworkHandler):
     def __init__(self,network,global_space,**kwargs):
-        super.__init__(self,network,**kwargs) 
+        super(AsyncNetworkHandler,self).__init__(network,**kwargs) 
         self._global_space = global_space
        
     '''
     Retrieves global shared parameters and performs single
     training step on them. Other processes may update these
-    parameters as well.
+    global parameters as well.
     '''
     def train(self):
+        if len(self._dataset) < self.batch_size:
+            pass
         #apply update to global params, using local data
         self._network.set_params(self._global_space.params)
-        loss = super.train(self)
+        S,A,R,Sp,T = self._dataset.get_batch(self.batch_size,random=False)
+        loss = self._network.train(S,A,R,Sp,T)
+        self.batch_counter += 1
         #this may overwrite updates by other processes
-        self._global_space.params = self.network.get_params()
+        self._global_space.params = self._network.get_params()
+        self._global_space.update = multiprocessing.current_process().name
+        self._dataset.clear()
         return loss

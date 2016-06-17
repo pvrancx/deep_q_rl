@@ -10,14 +10,9 @@ from bson import Binary
 
 import cPickle as pickle
 
-class ParameterServer(object):
-    def add_params(self,p):
-        pass
-    
-    def get_params(self):
-        pass
 
-class RemoteParameterServer(ParameterServer):
+
+class ParameterServer(object):
     
     def __init__(self, db, collection_name = 'params'):
         self._db = db
@@ -39,6 +34,5 @@ class RemoteParameterServer(ParameterServer):
         p = self._param_collection.find().sort('$natural', -1).limit(1).next()
         return (pickle.loads(p['params']),p['loss'],p['updates'])
         
-class ManagedParameterServer(ParameterServer):
     
         

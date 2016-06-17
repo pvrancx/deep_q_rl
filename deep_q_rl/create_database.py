@@ -18,7 +18,7 @@ def create_db(exp_name,size=1000000, host='localhost',port=27017):
         capped=True, 
         size=50*2**30, #50G
         max = size,
-        autoIndexId=False)
+        autoIndexId=True)
     
     db.create_collection(
         'params', 

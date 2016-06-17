@@ -91,6 +91,7 @@ class NeuralAgent(object):
         self._open_results_file()
         self._open_learning_file()
 
+        self.epoch_start_episode = 0 
         self.episode_counter = 0
         self.batch_counter = 0      # Tracks amount of batches trained
 
@@ -282,6 +283,10 @@ class NeuralAgent(object):
                 self.episode_counter += 1
                 self.total_reward += self.episode_reward
         else:
+            # perform last training step
+            loss = self._do_training()
+            if loss:
+                self.loss_averages.append(loss)
             # Store the latest sample.
             self.dataset.add_sample(self.last_img,
                                      self.last_action,
@@ -295,7 +300,7 @@ class NeuralAgent(object):
             logging.debug("steps/second: {:.2f}".format(\
                             self.step_counter/total_time))
 
-            if self.batch_counter > 0:
+            if self.network.batch_counter > 0:
                 self._update_learning_file()
                 logging.debug("average loss: {:.4f}".format(\
                                 np.mean(self.loss_averages)))
@@ -316,8 +321,7 @@ class NeuralAgent(object):
     def start_testing(self):
         self.testing = True
         self.total_reward = 0        
-        self.episode_counter_old = self.episode_counter
-        self.episode_counter = 0
+        #self.episode_counter = 0
 
 
 
@@ -325,12 +329,12 @@ class NeuralAgent(object):
         start_time = time.time()
         self.testing = False
         holdout_size = 3200
-        self.episode_counter = self.episode_counter_old
+
 
 
         # TODO check out holdout size in original code
         # Keep a random subset of transitions to evaluate performance over time
-        if self.holdout_data is None and len(self.dataset) > holdout_size:
+        if self.holdout_data is None and len(self.test_dataset) > holdout_size:
             self.holdout_data = self.dataset.random_batch(holdout_size)[0]
 
         holdout_sum = 0
@@ -339,11 +343,14 @@ class NeuralAgent(object):
                 holdout_sum += np.max(
                     self.network.q_vals(self.holdout_data[i, ...]))
 
-        self._update_results_file(epoch, self.episode_counter,
+        self._update_results_file(epoch, 
+                                  self.episode_counter - self.epoch_start_episode,
                                   holdout_sum / holdout_size)
 
         total_time = time.time() - start_time
         logging.info("Finishing up testing took {:.2f} seconds".format(total_time))
+        self.epoch_start_episode = self.episode_counter
+
 
 
 if __name__ == "__main__":

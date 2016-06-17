@@ -65,10 +65,15 @@ class MongoDataset(object):
         phi[-1,] = obs
         return phi
         
-    def random_batch(self, batch_size):
+    def random_batch(self, batch_size, random = True):
         assert batch_size < self._collection.count(), 'too few samples in db'
-        result = self._collection.aggregate([{'$sample': 
+        if random:
+            #random entries
+            result = self._collection.aggregate([{'$sample': 
                                                 {'size': batch_size }}])
+        else:
+            #last batchsize entries
+            result = self._collection.find().sort('_id',-1).limit(batch_size)
             
         phis = np.zeros((batch_size,self.hist_len)+self.obs_shape,
                        dtype= self.obs_type)
