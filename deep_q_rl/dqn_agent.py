@@ -14,8 +14,8 @@ import time
 import logging
 import uuid
 
-import pymongo
-from mongo_dataset import MongoDataset
+#import pymongo
+#from mongo_dataset import MongoDataset
 
 
 import numpy as np
@@ -334,6 +334,7 @@ class NeuralAgent(object):
 
         # TODO check out holdout size in original code
         # Keep a random subset of transitions to evaluate performance over time
+        #edit: use test set as holdout source
         if self.holdout_data is None and len(self.test_dataset) > holdout_size:
             self.holdout_data = self.dataset.random_batch(holdout_size)[0]
 

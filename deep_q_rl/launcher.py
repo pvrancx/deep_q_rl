@@ -21,10 +21,11 @@ import profile
 import tabular_dataset
 import pymongo
 import network_handler
-from param_server import ParameterServer
+from network_trainer import NetworkTrainer
 from ale_utils import ALEPreProcessor
 from create_database import create_db
 import multiprocessing
+from multiprocessing.managers import SyncManager,Namespace
 
 
 def parameters_as_dict(parameters):
@@ -50,13 +51,23 @@ def process_args(args, defaults, description):
     """
     parser = argparse.ArgumentParser(description=description)
 
-    parser.add_argument('--mongo_host', dest="mongo_host",
+    parser.add_argument('--mongo-host', dest="mongo_host",
                         default='localhost',
                         help='mongodb host'
                         '(default localhost)')  
-    parser.add_argument('--mongo_port', dest="mongo_port",
+    parser.add_argument('--mongo-port', dest="mongo_port",
                         type=int, default=27017,
                         help=('mongodb port'))
+    parser.add_argument('--param-host', dest="param_host",
+                        default='localhost',
+                        help='parameter server host'
+                        '(default localhost)')  
+    parser.add_argument('--param-port', dest="param_port",
+                        type=int, default=50000,
+                        help=('parameter server port'))
+    parser.add_argument('--password', dest="password",
+                        type=str, default='NO_MORE_SECRETS',
+                        help=('parameter server password'))
     parser.add_argument('--network_mode', dest="net_handler",
                         type=str, default='local',
                         help=('type of network training used local,\
@@ -264,8 +275,8 @@ def launch(args, defaults, description):
     
     if parameters.preprocess:
         preprocessor = ALEPreProcessor(defaults.RESIZED_WIDTH,
-                                              defaults.RESIZED_HEIGHT,
-                                              parameters.resize_method,)
+                                       defaults.RESIZED_HEIGHT,
+                                       parameters.resize_method,)
     else:
         preprocessor = None
         
@@ -333,46 +344,166 @@ def launch(args, defaults, description):
                                       act_type='uint8',
                                       max_steps=5000, 
                                       phi_length=parameters.phi_length)
+
+# Experiments can be run in several modes:
+#   -Local: standard dqn agent keeps database of samples and locally trains
+#           deep q-network using batch sampling
+#
+#  - distributed: gorilla-like setup, multiple agents act in their own 
+#           environments. Parameters are shared through parameter servers
+#           Agents do not train own netowork. This is done in separate 
+#           process(es). Data can be local to agents or shared through a 
+#           common replay database
+#
+#   - trainer: runs a batch training agent. Samples batches from dataset and
+#           updates network parameters. Parameters are shared true parameter
+#           server. Does not run actor that interacts with environment.
+#
+# - asynchronous: async RL like training. Multiple agents interact with their
+#           own environment. Locally train parameters, but share these through
+#           parameter server. Agents do not us replay data but update using 
+#           last k samples. Typically assumes agents are running on same host,
+#           but remote sharing is possible (but incurs communication overhead).
+#                                      
                                       
-                                      
-    if parameters.net_handler == 'local':
+    if parameters.net_handler== 'local':
+        #create local trainer
         net_handler = network_handler.NetworkHandler(
                                       network,
                                       training_dataset
                                       )
+        #create agent
+        agent = dqn_agent.NeuralAgent(training_dataset,
+                                  test_dataset,
+                                  net_handler,
+                                  parameters.epsilon_start,
+                                  parameters.epsilon_min,
+                                  parameters.epsilon_decay,
+                                  parameters.replay_start_size,
+                                  parameters.update_frequency,
+                                  rng, save_path, 
+                                  parameters.profile)
+        #create experiment
+        exp = experiment.GymExperiment(env, agent,preprocessor,
+                                              parameters.epochs,
+                                              parameters.steps_per_epoch,
+                                              parameters.steps_per_test,
+                                              rng,
+                                              parameters.progress_frequency)
+
+        #run experiment
+        exp.run()
         
     elif parameters.net_handler == 'distributed':
-        #this setting assumes that parameters are stored in a database somewhere
-        client = pymongo.MongoClient(host = parameters.mongo_host,
-                                 port = parameters.mongo_port)
-                                 
-        db = client[parameters.experiment_prefix] 
-        param_server = ParameterServer(db)
-        
+        #create parameter client
         net_handler = network_handler.RemoteNetworkHandler(
-                                      network,
-                                      param_server,
-                                      )
-    elif parameters.net_handler == 'async':
-        manager = multiprocessing.Manager()
-        ns = manager.Namespace()
-        ns.params = network.get_params()
-        ns.update = str(0)
+                            network,
+                            host = parameters.param_host,
+                            port = parameters.param_port,
+                            authkey = parameters.password)
+        
+
+        #create agent                             
+        agent = dqn_agent.NeuralAgent(training_dataset,
+                                  test_dataset,
+                                  net_handler,
+                                  parameters.epsilon_start,
+                                  parameters.epsilon_min,
+                                  parameters.epsilon_decay,
+                                  parameters.replay_start_size,
+                                  parameters.update_frequency,
+                                  rng, save_path, 
+                                  parameters.profile)
+        #create experiment
+        exp = experiment.GymExperiment(env, agent,preprocessor,
+                                              parameters.epochs,
+                                              parameters.steps_per_epoch,
+                                              parameters.steps_per_test,
+                                              rng,
+                                              parameters.progress_frequency)
+
+
+        exp.run()
+    elif parameters.net_handler == 'param_server':
+        #create shared parameters
+        ns = {}
+        ns['params'] = (network.get_params(),0,0.)
+        ns['process'] = 'init'
+        
+        #setup parameter server
+        SyncManager.register('get_space', callable=lambda: ns)
+
+        manager = SyncManager(address=(parameters.param_host,
+                                       parameters.param_port),
+                            authkey = parameters.password)
+        server = manager.get_server()
+        server.serve_forever()
+        
+    elif parameters.net_handler == 'trainer':
+
+        
+        #setup parameter client
         net_handler = network_handler.AsyncNetworkHandler(
                             network,
-                            ns,
+                            host = parameters.param_host,
+                            port = parameters.param_port,
+                            authkey = parameters.password,
                             dataset= training_dataset,
                             batch_size = parameters.batch_size)
+        
+        #launch trainer
+        trainer = NetworkTrainer(net_handler,                            
+                            min_samples = parameters.replay_start_size,
+                            max_updates = 
+                            parameters.steps_per_epoch*parameters.epochs
+                            )
+    
 
-    else:
-        raise RuntimeError('unknown network training method: '+
-                            parameters.net_handler)
+        trainer.do_training()
+        
+    elif parameters.net_handler == 'async':
+        
+        #create shared parameters
+        ns = {}
+        ns['params'] = (network.get_params(),0,0.)
+        ns['process'] = 'init'
+        
+        #setup parameter server
+        SyncManager.register('get_space', callable=lambda: ns)
 
-    if parameters.net_handler == 'async':
+        manager = SyncManager(address=(parameters.param_host,
+                                       parameters.param_port),
+                              authkey = parameters.password)
+        server = manager.get_server()
+        logging.info('starting parameter server')
+
+
+        #launch server
         procs = []
+
+        p = multiprocessing.Process(target=lambda: server.serve_forever())
+        procs.append(p)
+        p.start()
+        #server.serve_forever()
+
+                            
+        #create agent processes
         #NOTE: async updating uses multiprocessing, not multithreading
+
+        logging.info('launching agent processes')
+
+
         for a in xrange(parameters.n_agents):
+            #create parameter client
+            net_handler = network_handler.AsyncNetworkHandler(
+                            network,
+                            host = parameters.param_host,
+                            port = parameters.param_port,
+                            authkey = parameters.password,
+                            dataset= training_dataset,
+                            batch_size = parameters.batch_size)
             
+            #create local environment
             env = gym.make(parameters.environment)
 
             a_path = os.path.join(save_path,'agent'+str(a))
@@ -381,7 +512,7 @@ def launch(args, defaults, description):
             except OSError as ex:
                 # Directory most likely already exists
                 pass
-            #use differetn random seeds for agents
+            #use different random seeds for agents
             #if not parameters.deterministic:
             rng = np.random.RandomState()
         
@@ -405,33 +536,38 @@ def launch(args, defaults, description):
             p = multiprocessing.Process(target=run_exp, args=(exp,))
             procs.append(p)
             p.start()
-            time.sleep(1)
-
+            time.sleep(1) #decreases probability of overwriting updates
+            
+        #wait for all agents to finish
         for p in procs:
             p.join()
         
-        
     else:
-        agent = dqn_agent.NeuralAgent(training_dataset,
-                                  test_dataset,
-                                  net_handler,
-                                  parameters.epsilon_start,
-                                  parameters.epsilon_min,
-                                  parameters.epsilon_decay,
-                                  parameters.replay_start_size,
-                                  parameters.update_frequency,
-                                  rng, save_path, 
-                                  parameters.profile)
+        raise RuntimeError('unknown network training method: '+
+                            parameters.net_handler)
 
-        exp = experiment.GymExperiment(env, agent,preprocessor,
-                                              parameters.epochs,
-                                              parameters.steps_per_epoch,
-                                              parameters.steps_per_test,
-                                              rng,
-                                              parameters.progress_frequency)
-
-
-        exp.run()
+        
+#    else:
+#        agent = dqn_agent.NeuralAgent(training_dataset,
+#                                  test_dataset,
+#                                  net_handler,
+#                                  parameters.epsilon_start,
+#                                  parameters.epsilon_min,
+#                                  parameters.epsilon_decay,
+#                                  parameters.replay_start_size,
+#                                  parameters.update_frequency,
+#                                  rng, save_path, 
+#                                  parameters.profile)
+#
+#        exp = experiment.GymExperiment(env, agent,preprocessor,
+#                                              parameters.epochs,
+#                                              parameters.steps_per_epoch,
+#                                              parameters.steps_per_test,
+#                                              rng,
+#                                              parameters.progress_frequency)
+#
+#
+#        exp.run()
 
 
 

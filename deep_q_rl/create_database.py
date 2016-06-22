@@ -20,12 +20,12 @@ def create_db(exp_name,size=1000000, host='localhost',port=27017):
         max = size,
         autoIndexId=True)
     
-    db.create_collection(
-        'params', 
-        capped=True, 
-        size=2*2**30, #2G
-        max = 100,
-        autoIndexId=True)
+#    db.create_collection(
+#        'params', 
+#        capped=True, 
+#        size=2*2**30, #2G
+#        max = 100,
+#        autoIndexId=True)
     d_collection = db['training_data']
     d_collection.create_index([("agent_id", pymongo.ASCENDING),
                                 ("ep_id", pymongo.ASCENDING),
