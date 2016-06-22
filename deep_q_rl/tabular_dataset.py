@@ -4,6 +4,7 @@ construct randomly selected batches of phi's from the stored history.
 
 import numpy as np
 import theano
+import logging
 
 floatX = theano.config.floatX
 
@@ -107,6 +108,8 @@ chosen randomely, otherwise last batch_size transitions are used
 
         """
         if batch_size > self.size:
+            logging.debug('batchsize requested but size is '
+                          +str(batch_size) +' '+str(self.size))
             return None
             
         # Allocate the response.

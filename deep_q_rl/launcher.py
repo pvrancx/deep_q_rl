@@ -333,7 +333,7 @@ def launch(args, defaults, description):
     #env = gym.make(parameters.environment)
     
     if parameters.launch_mode == 'async':
-        db_size = parameters.update_frequency
+        db_size = max(parameters.update_frequency,parameters.batch_size)
     else:
         db_size = parameters.replay_memory_size
 

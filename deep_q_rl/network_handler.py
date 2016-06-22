@@ -64,7 +64,8 @@ class AsyncNetworkHandler(RemoteNetworkHandler):
     '''
     def train(self):
         if len(self._dataset) < self.batch_size:
-            pass
+            logging.debug('too few samples to train')
+            return 0.
         #apply update to global params, using local data
         super(AsyncNetworkHandler,self).train()
         S,A,R,Sp,T = self._dataset.get_batch(self.batch_size,random=False)
