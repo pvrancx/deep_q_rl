@@ -336,7 +336,7 @@ class NeuralAgent(object):
         # Keep a random subset of transitions to evaluate performance over time
         #edit: use test set as holdout source
         if self.holdout_data is None and len(self.test_dataset) > holdout_size:
-            self.holdout_data = self.dataset.get_batch(holdout_size)[0]
+            self.holdout_data = self.test_dataset.get_batch(holdout_size)[0]
 
         holdout_sum = 0
         if self.holdout_data is not None:

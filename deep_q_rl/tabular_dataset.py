@@ -106,6 +106,9 @@ next_states for batch_size  state transitions. If random = True transitions are
 chosen randomely, otherwise last batch_size transitions are used
 
         """
+        if batch_size > self.size:
+            return None
+            
         # Allocate the response.
         states = np.zeros((batch_size,
                            self.phi_length)+self.obs_shape,
