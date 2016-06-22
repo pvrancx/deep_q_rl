@@ -50,7 +50,11 @@ def process_args(args, defaults, description):
     description - a string to display at the top of the help message.
     """
     parser = argparse.ArgumentParser(description=description)
-
+    parser.add_argument('--database', dest="database",
+                        default='ndarray',
+                        help='replay database type:\
+                        ndarray, mongodb or none (default: ndarray)'
+                        '(default localhost)') 
     parser.add_argument('--mongo-host', dest="mongo_host",
                         default='localhost',
                         help='mongodb host'
@@ -68,10 +72,11 @@ def process_args(args, defaults, description):
     parser.add_argument('--password', dest="password",
                         type=str, default='NO_MORE_SECRETS',
                         help=('parameter server password'))
-    parser.add_argument('--network_mode', dest="net_handler",
+    parser.add_argument('--mode', dest="launch_mode",
                         type=str, default='local',
-                        help=('type of network training used local,\
-                        distributed or async (default:local)'))
+                        help=('type of process to launch local,\
+                        ,training,parm_server distributed or async\
+                        (default:local)'))
     parser.add_argument('--num_agents', dest="n_agents",
                         type=int, default=2,
                         help=('number of agents, only for async mode\
@@ -327,7 +332,7 @@ def launch(args, defaults, description):
     
     #env = gym.make(parameters.environment)
     
-    if parameters.net_handler == 'async':
+    if parameters.launch_mode == 'async':
         db_size = parameters.update_frequency
     else:
         db_size = parameters.replay_memory_size
@@ -366,7 +371,7 @@ def launch(args, defaults, description):
 #           but remote sharing is possible (but incurs communication overhead).
 #                                      
                                       
-    if parameters.net_handler== 'local':
+    if parameters.launch_mode== 'local':
         #create local trainer
         net_handler = network_handler.NetworkHandler(
                                       network,
@@ -394,7 +399,7 @@ def launch(args, defaults, description):
         #run experiment
         exp.run()
         
-    elif parameters.net_handler == 'distributed':
+    elif parameters.launch_mode == 'distributed':
         #create parameter client
         net_handler = network_handler.RemoteNetworkHandler(
                             network,
@@ -424,7 +429,7 @@ def launch(args, defaults, description):
 
 
         exp.run()
-    elif parameters.net_handler == 'param_server':
+    elif parameters.launch_mode == 'param_server':
         #create shared parameters
         ns = {}
         ns['params'] = (network.get_params(),0,0.)
@@ -439,7 +444,7 @@ def launch(args, defaults, description):
         server = manager.get_server()
         server.serve_forever()
         
-    elif parameters.net_handler == 'trainer':
+    elif parameters.launch_mode == 'trainer':
 
         
         #setup parameter client
@@ -461,7 +466,7 @@ def launch(args, defaults, description):
 
         trainer.do_training()
         
-    elif parameters.net_handler == 'async':
+    elif parameters.launch_mode == 'async':
         
         #create shared parameters
         ns = {}
@@ -543,31 +548,10 @@ def launch(args, defaults, description):
             p.join()
         
     else:
-        raise RuntimeError('unknown network training method: '+
-                            parameters.net_handler)
+        raise RuntimeError('unknown launch mode: '+
+                            parameters.launch_mode)
 
         
-#    else:
-#        agent = dqn_agent.NeuralAgent(training_dataset,
-#                                  test_dataset,
-#                                  net_handler,
-#                                  parameters.epsilon_start,
-#                                  parameters.epsilon_min,
-#                                  parameters.epsilon_decay,
-#                                  parameters.replay_start_size,
-#                                  parameters.update_frequency,
-#                                  rng, save_path, 
-#                                  parameters.profile)
-#
-#        exp = experiment.GymExperiment(env, agent,preprocessor,
-#                                              parameters.epochs,
-#                                              parameters.steps_per_epoch,
-#                                              parameters.steps_per_test,
-#                                              rng,
-#                                              parameters.progress_frequency)
-#
-#
-#        exp.run()
 
 
 
