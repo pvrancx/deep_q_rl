@@ -487,7 +487,7 @@ def launch(args, defaults, description):
         procs = []
 
         p = multiprocessing.Process(target=lambda: server.serve_forever())
-        procs.append(p)
+        #procs.append(p)
         p.start()
         #server.serve_forever()
 
