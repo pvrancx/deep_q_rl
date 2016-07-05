@@ -1,7 +1,9 @@
-"""The ALEExperiment class handles the logic for training a deep
-Q-learning agent in the Arcade Learning Environment.
+"""The GymExperiment class handles the logic for training a deep
+Q-learning agent in an OpenAI Gym Environment.
 
-Author: Nathan Sprague
+
+author pvrancx
+Based on ALEExperiment by Nathan Sprague
 
 """
 import logging

@@ -119,12 +119,12 @@ class AsyncNetworkHandler(RemoteNetworkHandler):
         if self.n_steps % self.update_freq == 0:
             super(AsyncNetworkHandler,self).train()
                     
-        #check if target has been updated
-        (global_target, global_steps) = self._global_space.get_target_param_values()
-        if global_steps > self.last_target_update:
-            self._network.set_q_hat(global_target)
-            self.last_target_update = global_steps
-        
+            #check if target has been updated
+            (global_target, global_steps) = self._global_space.get_target_param_values()
+            if global_steps > self.last_target_update:
+                self._network.set_q_hat(global_target)
+                self.last_target_update = global_steps
+
         #single update step
         S,A,R,Sp,T = self._dataset.get_batch(self.batch_size,random=True)
         grads,loss = self._network.grads(S,A,R,Sp,T)#doesn't update local params

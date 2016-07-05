@@ -10,7 +10,7 @@ import lasagne
 from updates import deepmind_rmsprop
 from collections import OrderedDict
 import copy
-
+import logging
 
 class ParameterServer(object):
     
@@ -35,6 +35,8 @@ class ParameterServer(object):
         self._grad_vars = []
         self._update_fns = [] #OrderedDict()
         for i,p in enumerate(params):
+            logging.debug('param.name: '+str(p.name) )
+            logging.debug('param size: '+str(p.get_value().shape))
             g = T.TensorType(theano.config.floatX, 
                              [False] * p.ndim)(str(p.name)+'_grad')
             self._grad_vars.append(g)

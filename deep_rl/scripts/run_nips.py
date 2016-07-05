@@ -44,7 +44,7 @@ class Defaults:
     UPDATE_FREQUENCY = 20            # Perform training every step
     REPLAY_MEMORY_SIZE = 1000000
     BATCH_SIZE = 32
-    NETWORK_TYPE = "nips_cpu"
+    NETWORK_TYPE = "nips"
     FREEZE_INTERVAL = 2000            # -1
     REPLAY_START_SIZE = 100
     RESIZE_METHOD = 'scale'           # crop

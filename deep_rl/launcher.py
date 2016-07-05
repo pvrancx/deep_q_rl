@@ -15,17 +15,17 @@ import simplejson as json
 import gym 
 
 import experiment
-import dqn_agent
+from agents import dqn_agent
 import lasagne
-import q_network
-from parameter_server import ParameterServer
+from network import q_network
+from network.parameter_server import ParameterServer
 import profile
-import tabular_dataset
+from datasets import tabular_dataset
 import pymongo
-import network_handler
-from network_trainer import NetworkTrainer
-from ale_utils import ALEPreProcessor
-from create_database import create_db
+from network import network_handler
+from network.network_trainer import NetworkTrainer
+from utils.ale_utils import ALEPreProcessor
+from utils.database import create_db
 import multiprocessing
 from multiprocessing.managers import SyncManager
 

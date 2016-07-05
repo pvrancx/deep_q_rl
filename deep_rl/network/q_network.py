@@ -224,11 +224,13 @@ class DeepQLearner:
 
     def q_vals(self, state):
         '''Returns all q-values for given state '''
+        
         # Might be a slightly cheaper way by reshaping the passed-in state,
         # though that would destroy the original
         states = np.zeros((1, self.num_frames)+self.input_shape, 
                           dtype=theano.config.floatX)
         states[0, ...] = state
+        logging.debug('q-value input state shape: '+str(states.shape) )
         self.states_shared.set_value(states)
         return self._q_vals()[0]
         
