@@ -12,6 +12,8 @@ Nature, 518(7540):529-533, February 2015
 
 Author of Lasagne port: Nissan Pow
 Modifications: Nathan Sprague
+
+Modifications: pvrancx
 """
 import re
 import logging
@@ -87,6 +89,7 @@ class DeepQLearner:
 
         q_vals = lasagne.layers.get_output(self.l_out, states / input_scale)
         
+        #target network
         if self.freeze_interval > 0:
             next_q_vals = lasagne.layers.get_output(self.next_l_out,
                                                     next_states / input_scale)
@@ -151,6 +154,10 @@ class DeepQLearner:
                                       givens=givens)
         self._q_vals = theano.function([], q_vals,
                                        givens={states: self.states_shared})
+                                       
+        grads = T.grad(loss,params)
+        #note: add updates?
+        self._grads = theano.function([], grads +[loss],givens=givens)
 
     def build_network(self, network_type, input_shape,
                       output_dim, num_frames, batch_size):
@@ -223,6 +230,32 @@ class DeepQLearner:
         loss, _ = self._train()
         self.update_counter += 1
         return np.sqrt(loss)
+        
+    
+    def grads(self, states, actions, rewards, next_states, terminals):
+        """
+        returns gradients for one batch. Does not update parameters.
+
+        Arguments:
+
+        states - b x f x h x w numpy array, where b is batch size,
+                 f is num frames, h is height and w is width.
+        actions - b x 1 numpy array of integers
+        rewards - b x 1 numpy array
+        next_states - b x f x h x w numpy array
+        terminals - b x 1 numpy boolean array (currently ignored)
+
+        Returns: gradients, average loss
+        """
+
+        self.states_shared.set_value(states)
+        self.next_states_shared.set_value(next_states)
+        self.actions_shared.set_value(actions)
+        self.rewards_shared.set_value(rewards)
+        self.terminals_shared.set_value(terminals)
+        result = self._grads()
+        grads, loss = result[:-1],result[-1]
+        return (grads,np.sqrt(loss))
 
     def q_vals(self, state):
         # Might be a slightly cheaper way by reshaping the passed-in state,
@@ -245,6 +278,9 @@ class DeepQLearner:
             return self.rng.randint(0, self.num_actions)
         q_vals = self.q_vals(state)
         return np.argmax(q_vals)
+        
+    def set_q_hat(self,params):
+        lasagne.layers.helper.set_all_param_values(self.next_l_out, params)
 
     def reset_q_hat(self):
         all_params = lasagne.layers.helper.get_all_param_values(self.l_out)

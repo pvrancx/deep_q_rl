@@ -8,7 +8,7 @@ NIPS Deep Learning Workshop 2013
 
 """
 
-import launcher
+from deep_rl import launcher
 import sys
 
 class Defaults:
