@@ -11,6 +11,8 @@ from updates import deepmind_rmsprop
 from collections import OrderedDict
 import copy
 import logging
+import cPickle as pickle
+import numpy as np
 
 logger = logging.getLogger()
 
@@ -71,11 +73,21 @@ class ParameterServer(object):
         self.target_param_values = copy.deepcopy(self.get_param_values()[0])
             
     def update(self,params,gradients,steps,loss):
+        ''' update parameters using provided gradients'''
+
         assert len(params) == len(gradients), 'wrong number of gradients'
         if (steps - self.n_updates) > self.max_delay:
             return #stale gradient, skip update
         for i,p in enumerate(params):
-            self._update_fns[i](gradients[i])
+            try:
+                self._update_fns[i](gradients[i])
+            #Fix me: for some reason this update fails sometimes in asynchronous mode
+            except TypeError:
+                l =copy.copy(locals())
+                with open('dump'+str(np.random.rand())+'.pkl','wb') as f:
+                    pickle.dump(l,f)
+                return 0.
+            
         self.n_updates += 1
         if self.n_updates % self.target_update_freq == 0:
             #note copy needed?
@@ -88,9 +100,11 @@ class ParameterServer(object):
         
         
     def get_param_values(self):
+        '''returns current parameter values'''
         return ([p.get_value() for p in self.params],self.n_updates,self.loss)
         
     def get_target_param_values(self):
+        '''returns current target parameter values'''
         return (self.target_param_values, self.target_updates)
         
         

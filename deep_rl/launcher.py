@@ -345,7 +345,7 @@ def launch(args, defaults, description):
     
     #env = gym.make(parameters.environment)
     
-    if parameters.launch_mode == 'async':
+    if parameters.launch_mode == 'agent':
         db_size = max(parameters.update_frequency,parameters.batch_size)
     else:
         db_size = parameters.replay_memory_size
@@ -504,19 +504,19 @@ def launch(args, defaults, description):
         manager = ParamManager(address=(parameters.param_host,
                                        parameters.param_port),
                             authkey = parameters.password)
-        server = manager.get_server()
+        #server = manager.get_server()
+    
         logging.info('starting parameter server')
-
-
+        
+        manager.start()
         #launch server
         procs = []
 
-        p = multiprocessing.Process(target=lambda: server.serve_forever())
+        #p = multiprocessing.Process(target=lambda: server.serve_forever())
         #procs.append(p)
-        p.start()
         #server.serve_forever()
-
-                            
+        
+        lock = manager.Lock()
         #create agent processes
         #NOTE: async updating uses multiprocessing, not multithreading
 
@@ -526,7 +526,7 @@ def launch(args, defaults, description):
         for a in xrange(parameters.n_agents):
             #create parameter client
             net_handler = network_handler.AsyncNetworkHandler(
-                            network,
+                            network, lock,
                             host = parameters.param_host,
                             port = parameters.param_port,
                             authkey = parameters.password,

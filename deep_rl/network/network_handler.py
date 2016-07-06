@@ -83,7 +83,7 @@ class AsyncNetworkHandler(RemoteNetworkHandler):
     that read and write operations will be syncrhonized and cannot interfere
     with those of other processes. 
     ''' 
-    def __init__(self,network,
+    def __init__(self,network,lock,
                   max_loss = 3,
                   param_update_freq = 1,
                   target_update_freq = 1000,
@@ -92,6 +92,7 @@ class AsyncNetworkHandler(RemoteNetworkHandler):
                   **kwargs):
         super(AsyncNetworkHandler,self).__init__(network,**kwargs)
         self.clear_samples = clear_samples
+        self.lock = lock #self.param_server.Lock()
         
         self.mu_loss = 0.
         self.var_loss =0.
@@ -157,7 +158,9 @@ class AsyncNetworkHandler(RemoteNetworkHandler):
 
         
         #push update to global space
-        self._global_space.update(self.params, grads, self.batch_counter, loss)
+        with self.lock:
+            self._global_space.update(self.params, grads,
+                                      self.batch_counter, loss)
             
         if self.clear_samples:
             self._dataset.clear()
