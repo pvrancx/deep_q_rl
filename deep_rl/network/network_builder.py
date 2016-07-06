@@ -55,7 +55,7 @@ class NetworkBuilder(object):
                     )
                     
     @staticmethod
-    def build_nips(input_shape,output_dim,batch_size=None,conv_type='cpu'):
+    def build_nips(input_shape,output_dim,batch_size=None,conv_type='cpu',**kwargs):
         net = NetworkBuilder.create_input_layer(input_shape,
                                                 batch_size=batch_size)
         net = NetworkBuilder.add_conv2D_layer(
@@ -83,7 +83,7 @@ class NetworkBuilder(object):
         return net
      
     @staticmethod
-    def build_linear(input_shape,output_dim,batch_size=None):
+    def build_linear(input_shape,output_dim,batch_size=None,**kwargs):
         net = NetworkBuilder.create_input_layer(input_shape,
                                                 batch_size=batch_size)
         net = NetworkBuilder.add_dense_layer(
@@ -97,7 +97,7 @@ class NetworkBuilder(object):
                   output_dim,
                   size=100,
                   batch_size = None,
-                  nonlinearity=lasagne.nonlinearities.rectify):
+                  nonlinearity=lasagne.nonlinearities.rectify,**kwargs):
         net = NetworkBuilder.create_input_layer(input_shape,
                                                 batch_size=batch_size)
         net = NetworkBuilder.add_dense_layer(
@@ -111,7 +111,8 @@ class NetworkBuilder(object):
         return net
         
     @staticmethod
-    def build_nature(input_shape,output_dim,batch_size= None,conv_type= 'cpu'):
+    def build_nature(input_shape,output_dim,batch_size= None,conv_type= 'cpu',
+                     **kwargs):
         net = NetworkBuilder.create_input_layer(input_shape,
                                                 batch_size=batch_size)
         net = NetworkBuilder.add_conv2D_layer(

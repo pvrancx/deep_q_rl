@@ -164,13 +164,13 @@ class DeepQLearner:
                                        
         grads = T.grad(loss,params)
         #note: add updates?
-        self._grads = theano.function([], grads +[loss],givens=givens)
+        self._grads = theano.function([], grads+[loss],givens=givens)
 
     
 
     def train(self, states, actions, rewards, next_states, terminals):
         """
-        Train one batch.
+        Train network on a single batch.
 
         Arguments:
 
@@ -227,30 +227,34 @@ class DeepQLearner:
         
         # Might be a slightly cheaper way by reshaping the passed-in state,
         # though that would destroy the original
-        states = np.zeros((1, self.num_frames)+self.input_shape, 
+        states = np.zeros((self.batch_size, self.num_frames)+self.input_shape, 
                           dtype=theano.config.floatX)
         states[0, ...] = state
-        logging.debug('q-value input state shape: '+str(states.shape) )
         self.states_shared.set_value(states)
         return self._q_vals()[0]
         
     def set_params(self,params):
+        '''sets network parameters to provided values'''
         lasagne.layers.helper.set_all_param_values(self.l_out, params)
 
     def get_params(self):
+        '''Returns current network parameter values'''
         return lasagne.layers.helper.get_all_param_values(self.l_out)
         
 
     def choose_action(self, state, epsilon):
+        '''epsilon greedy action selection'''
         if self.rng.rand() < epsilon:
             return self.rng.randint(0, self.num_actions)
         q_vals = self.q_vals(state)
         return np.argmax(q_vals)
         
     def set_q_hat(self,params):
+        '''sets target parameters to provided parameter values'''
         lasagne.layers.helper.set_all_param_values(self.next_l_out, params)
 
     def reset_q_hat(self):
+        '''sets target parameter values to current network parameter values'''
         all_params = lasagne.layers.helper.get_all_param_values(self.l_out)
         lasagne.layers.helper.set_all_param_values(self.next_l_out, all_params)
 

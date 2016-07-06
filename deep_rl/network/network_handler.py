@@ -8,6 +8,9 @@ import logging
 import math
 import multiprocessing as mp
 from multiprocessing.managers import SyncManager
+import logging
+
+logger = logging.getLogger()
 
 class NetworkHandler(object):
     
@@ -128,6 +131,7 @@ class AsyncNetworkHandler(RemoteNetworkHandler):
         #single update step
         S,A,R,Sp,T = self._dataset.get_batch(self.batch_size,random=True)
         grads,loss = self._network.grads(S,A,R,Sp,T)#doesn't update local params
+        logger.debug('grad loss {:f}'.format(loss))
         
         #reject update if loss is too high
         if self.n_steps < 2:

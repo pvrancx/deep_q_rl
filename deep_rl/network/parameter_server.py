@@ -12,6 +12,9 @@ from collections import OrderedDict
 import copy
 import logging
 
+logger = logging.getLogger()
+
+
 class ParameterServer(object):
     
     def __init__(self,params,update_rule,
@@ -38,7 +41,7 @@ class ParameterServer(object):
             logging.debug('param.name: '+str(p.name) )
             logging.debug('param size: '+str(p.get_value().shape))
             g = T.TensorType(theano.config.floatX, 
-                             [False] * p.ndim)(str(p.name)+'_grad')
+                             [False] * p.ndim)()
             self._grad_vars.append(g)
         
             #get updates for vars
@@ -58,7 +61,8 @@ class ParameterServer(object):
                 updates = lasagne.updates.apply_momentum(updates, None,
                                                      self.momentum)
                 
-            self._update_fns.append(theano.function([g],[p], updates=updates))
+            logger.debug('creating grad fn grad '+str(g)+' param '+str(p))
+            self._update_fns.append(theano.function([g],p, updates=updates))
             
         self.n_updates = 0
         self.target_updates = 0
@@ -67,6 +71,7 @@ class ParameterServer(object):
         self.target_param_values = copy.deepcopy(self.get_param_values()[0])
             
     def update(self,params,gradients,steps,loss):
+        assert len(params) == len(gradients), 'wrong number of gradients'
         if (steps - self.n_updates) > self.max_delay:
             return #stale gradient, skip update
         for i,p in enumerate(params):
