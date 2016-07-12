@@ -23,8 +23,8 @@ class NetworkHandler(object):
     def choose_action(self,phi,eps):
         return self._network.choose_action(phi,eps)
         
-    def q_vals(self,states):
-        return self._network.q_vals(states)
+    def get_value(self,states):
+        return self._network.get_value(states)
     
     '''
     Samples data and performs 1 training step of the local network.
@@ -126,7 +126,7 @@ class AsyncNetworkHandler(RemoteNetworkHandler):
             #check if target has been updated
             (global_target, global_steps) = self._global_space.get_target_param_values()
             if global_steps > self.last_target_update:
-                self._network.set_q_hat(global_target)
+                self._network.set_target_params(global_target)
                 self.last_target_update = global_steps
 
         #single update step

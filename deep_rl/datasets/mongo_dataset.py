@@ -61,7 +61,7 @@ class MongoDataset(object):
     def phi(self,obs):
         phi = np.zeros((self.hist_len,)+ self.obs_shape, 
                         dtype=floatX)
-        phi[0:len(self.obs_queue),] = self.obs_queue
+        phi[-len(self.obs_queue)-1:-1,] = self.obs_queue
         phi[-1,] = obs
         return phi
         

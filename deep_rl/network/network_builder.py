@@ -104,7 +104,7 @@ class NetworkBuilder(object):
                 net,
                 size=size,
                 nonlinearity=nonlinearity)
-        net = NetworkBuilder.add_Dense_layer(
+        net = NetworkBuilder.add_dense_layer(
                 net,
                 size=output_dim,
                 nonlinearity=None)

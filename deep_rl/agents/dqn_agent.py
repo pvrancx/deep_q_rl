@@ -193,10 +193,11 @@ class NeuralAgent(object):
         """
 
         self.step_counter += 1
+        self.episode_reward += reward
+
 
         #TESTING---------------------------
         if self.testing:
-            self.episode_reward += reward
             action = self._choose_action(self.test_dataset, .05,
                                          observation, np.clip(reward, -1, 1))
 
@@ -273,6 +274,7 @@ class NeuralAgent(object):
         """
 
         self.episode_reward += reward
+        logging.debug('episode reward: {:.2f}'.format(self.episode_reward))
         self.step_counter += 1
         total_time = time.time() - self.start_time
 
@@ -341,8 +343,8 @@ class NeuralAgent(object):
         holdout_sum = 0
         if self.holdout_data is not None:
             for i in range(holdout_size):
-                holdout_sum += np.max(
-                    self.network.q_vals(self.holdout_data[i, ...]))
+                holdout_sum +=  self.network.get_value(
+                                    self.holdout_data[i, ...])
 
         self._update_results_file(epoch, 
                                   self.episode_counter - self.epoch_start_episode,

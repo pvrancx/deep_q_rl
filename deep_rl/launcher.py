@@ -21,6 +21,7 @@ from network import q_network
 from network.parameter_server import ParameterServer
 import profile
 from datasets import tabular_dataset
+from datasets.mongo_dataset import MongoDataset
 import pymongo
 from network import network_handler
 from network.network_trainer import NetworkTrainer
@@ -104,12 +105,16 @@ def process_args(args, defaults, description):
                         action='store_true', default=False,
                         help='Show the game screen.')
     exp_group.add_argument('--preprocess', dest="preprocess",
-                        action='store_true', default=True,
+                        action='store_true', default=False,
                         help='preprocess observations')
     exp_group.add_argument('--experiment-prefix', dest="experiment_prefix",
                         default=None,
                         help='Experiment name prefix '
                         '(default is the name of the game)')
+    exp_group.add_argument('--algorithm', dest="algo",
+                        default='dqn',type=str,
+                        help='Learning algorithm: dqn | a3c'+
+                        '(default: dqn)')
                         
     exp_group.add_argument('--resize-method', dest="resize_method",
                         type=str, default=defaults.RESIZE_METHOD,
@@ -313,7 +318,15 @@ def launch(args, defaults, description):
         obs_shape = preprocessor.output_shape
 
     if parameters.nn_file is None:
-        network = q_network.DeepQLearner(obs_shape,
+        if parameters.algo.lower() =='dqn':
+            net_fn = q_network.DeepQLearner
+        elif parameters.algo.lower() =='a3c':
+            net_fn = q_network.PolicyGradientNetwork
+            if not parameters.database == 'sequential':
+                raise RuntimeError('a3c requires sequential database')
+        else:
+            raise RuntimeError('unknown algorithm')
+        network = net_fn(obs_shape,
                                          num_actions,
                                          parameters.phi_length,
                                          parameters.discount,
@@ -350,13 +363,28 @@ def launch(args, defaults, description):
     else:
         db_size = parameters.replay_memory_size
 
+    if parameters.database == 'mongo':
+        client = pymongo.MongoClient(host = parameters.mongo_host,
+                                 port = parameters.mongo_port)
+                                 
+        create_db(parameters.experiment_prefix,
+                  host = parameters.mongo_host,
+                  port = parameters.mongo_port)
     
-    training_dataset = tabular_dataset.DataSet(rng,obs_shape,
+        db = client[parameters.experiment_prefix]
+        training_dataset = MongoDataset(db,parameters.experiment_prefix)
+    elif parameters.database == 'ndarray':  
+        training_dataset = tabular_dataset.DataSet(rng,obs_shape,
                                       obs_type='uint8',
                                       act_type='uint8',
                                       max_steps=db_size , 
                                       phi_length=parameters.phi_length)
-                                      
+    elif parameters.database == 'sequential':
+            training_dataset = tabular_dataset.SequentialDataSet(
+                                      max_steps=db_size , 
+                                      phi_length=parameters.phi_length)
+    else:
+        raise RuntimeError('unknown database')
     test_dataset = tabular_dataset.DataSet(rng, obs_shape,
                                       obs_type='uint8',
                                       act_type='uint8',

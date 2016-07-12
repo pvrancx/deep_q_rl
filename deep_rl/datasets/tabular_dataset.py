@@ -5,10 +5,140 @@ construct randomly selected batches of phi's from the stored history.
 import numpy as np
 import theano
 import logging
+from collections import deque
+import copy
 
 floatX = theano.config.floatX
 
-class DataSet(object):
+class DataSetInterface(object):
+    '''
+    Minimum interface for datasets
+    '''
+    def clear(self):
+        pass
+    
+    def add_sample(S,A,R,T,ep,st,ag):
+        pass
+    
+    def __len__(self):
+        return 0
+        
+    def get_batch(self,batch_size):
+        return None
+        
+    def phi(self, obs):
+        pass
+        
+class SequentialDataSet(DataSetInterface):
+    '''
+    Replay memory that stores and returns samples in FIFO order
+    
+    '''
+    
+    def __init__(self,max_steps, phi_length):
+        ''' Create a dataset '''
+    
+        self._obs = deque()
+        self._acts = deque()
+        self._rews = deque()
+        self._terms = deque()
+        
+        self.max_steps = max_steps
+        self.phi_length = phi_length
+        
+        
+    def _n_steps(self):
+        return len(self._obs)
+        
+    def _n_term(self):
+        return np.sum(self._terms)
+        
+    def add_sample(self,s,a,r,t,*args):
+        self._obs.append(s)
+        self._acts.append(a)
+        self._rews.append(r)
+        self._terms.append(t)
+        
+        if self._n_steps() > self.max_steps:
+            self._obs.popleft()
+            self._rews.popleft()
+            self._acts.popleft()
+            self._terms.popleft()
+            
+    def clear(self):
+        self._obs.clear()
+        self._acts.clear()
+        self._terms.clear()
+        self._rews.clear()
+        
+    def phi(self, obs):
+        """Return a sequence of observations, using the last phi_length -
+        1, plus obs.
+
+        """
+
+        phi = np.empty((self.phi_length,) +self._obs[-1].shape, dtype=floatX)
+        #phi[0:self.phi_length - 1] = np.array(self._obs[-self.phi_length+1:])
+        for i in xrange(-1,-self.phi_length,-1):
+            phi[i-1] = self._obs[i]
+        phi[-1] = obs
+        return phi
+        
+        
+    def __len__(self):
+        return max(0,self._n_steps()- self.phi_length - 
+            self._n_term() * self.phi_length)
+            
+    def _pop_step(self):
+        s = self._obs.popleft()
+        a = self._acts.popleft()
+        r = self._rews.popleft()
+        t = self._terms.popleft()
+        
+        return s,a,r,t
+            
+    def get_batch(self, batch_size,**kwargs):
+        '''
+        returns min(batch_size, len(self)) transition samples in FIFO order
+    
+        '''
+        states = []
+        rews = []
+        next_states = []
+        terms = []
+        acts = []
+        
+        current_state = deque()
+        
+        while not self._n_steps()==0 and len(states) < batch_size:
+            s,a,r,t = self._pop_step()
+
+            if len(current_state) == self.phi_length:
+                states.append(copy.deepcopy(current_state))
+                rews.append(r)
+                acts.append(a)
+                current_state.popleft()
+                current_state.append(s)
+                terms.append(t)
+                next_states.append(copy.deepcopy(current_state))
+            else:
+                current_state.append(s)
+            
+            #terminal states can't be transition starts
+            if t:
+                current_state.clear()
+                
+        return (np.array(states,dtype=floatX),
+                np.array(acts,dtype='int32')[:,np.newaxis],
+                np.array(rews,dtype=floatX)[:,np.newaxis],
+                np.array(next_states,dtype=floatX),
+                np.array(terms,dtype='int32')[:,np.newaxis]
+                )
+            
+        
+        
+
+class DataSet(DataSetInterface):
     """A replay memory consisting of circular buffers for observed images,
     actions, and rewards.
     """
