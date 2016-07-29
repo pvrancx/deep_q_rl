@@ -85,7 +85,7 @@ def process_args(args, defaults, description):
     param_group.add_argument('--password', dest="password",
                         type=str, default='NO_MORE_SECRETS',
                         help=('parameter server password'))
-    param_group.add_argument('--max_delay', dest="max_delay",
+    param_group.add_argument('--max-delay', dest="max_delay",
                         type=int, default=10,
                         help=('max update steps before gradients are stale'))
     ##experiment  parameters
@@ -198,7 +198,7 @@ def process_args(args, defaults, description):
 
     
 
-    parser.add_argument('--log_level', dest="log_level",
+    parser.add_argument('--log-level', dest="log_level",
                         type=str, default=logging.INFO,
                         help=('Log level to terminal. ' +
                               '(default: %(default)s)'))
@@ -215,10 +215,10 @@ def process_args(args, defaults, description):
                         ,training,param_server distributed or async\
                         (default:local)'))
     
-    parser.add_argument('--num_agents', dest="n_agents",
-                        type=int, default=2,
-                        help=('number of agents, only for async mode\
-                        (default:2)'))
+    parser.add_argument('--num-procs', dest="n_agents",
+                        type=int, default=1,
+                        help=('number of processes to launch (not for local)\
+                        (default:1)'))
     
 
     parameters = parser.parse_args(args)
