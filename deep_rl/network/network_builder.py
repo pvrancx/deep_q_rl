@@ -95,15 +95,16 @@ class NetworkBuilder(object):
     @staticmethod    
     def build_mlp(input_shape,
                   output_dim,
-                  size=100,
+                  sizes=[20],
                   batch_size = None,
                   nonlinearity=lasagne.nonlinearities.rectify,**kwargs):
         net = NetworkBuilder.create_input_layer(input_shape,
                                                 batch_size=batch_size)
-        net = NetworkBuilder.add_dense_layer(
-                net,
-                size=size,
-                nonlinearity=nonlinearity)
+        for s in sizes:
+            net = NetworkBuilder.add_dense_layer(
+                    net,
+                    size=s,
+                    nonlinearity=nonlinearity)
         net = NetworkBuilder.add_dense_layer(
                 net,
                 size=output_dim,

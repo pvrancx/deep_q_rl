@@ -23,7 +23,7 @@ class Defaults:
     # ----------------------
     # ENVIRONMENT Parameters
     # ----------------------
-    ENV = 'Breakout-v0'
+    ENV = 'Pong-v0'
 
 
     # ----------------------
@@ -38,14 +38,14 @@ class Defaults:
     MOMENTUM = 0
     CLIP_DELTA = 0
     EPSILON_START = 1.0
-    EPSILON_MIN = .1
+    EPSILON_MIN = .01
     EPSILON_DECAY = 1000000
     PHI_LENGTH = 4
-    UPDATE_FREQUENCY = 20            # Perform training every step
-    REPLAY_MEMORY_SIZE = 1000000
+    UPDATE_FREQUENCY = 5            # Perform training every step
+    REPLAY_MEMORY_SIZE = 100000
     BATCH_SIZE = 32
     NETWORK_TYPE = "nips"
-    FREEZE_INTERVAL = 2000            # -1
+    FREEZE_INTERVAL = 5000            # -1
     REPLAY_START_SIZE = 100
     RESIZE_METHOD = 'scale'           # crop
     RESIZED_WIDTH = 84

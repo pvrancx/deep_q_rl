@@ -92,9 +92,14 @@ class NeuralAgent(object):
         self._open_learning_file()
 
         self.epoch_start_episode = 0 
-        self.episode_counter = 0
-        self.batch_counter = 0      # Tracks amount of batches trained
+        self.test_start_episode = 0 
+        self.n_train_episodes = 0
+        self.n_test_episodes = 0
+        self.total_train_reward =0.
+        self.total_test_reward =0.
 
+        self.batch_counter = 0      # Tracks amount of batches trained
+        self.total_reward = 0
         self.holdout_data = None
 
         self.agent_id = str(uuid.uuid4())
@@ -113,7 +118,9 @@ class NeuralAgent(object):
         logging.info("OPENING " + self.exp_dir + '/results.csv')
         self.results_file = open(self.exp_dir + '/results.csv', 'w', 0)
         self.results_file.write(\
-            'epoch,num_episodes,num_updates,total_reward,reward_per_episode,mean_q\n')
+            'epoch,num_batches,train_episodes,test_epsiodes, '
+            +'total_train_reward,train_reward_per_episode, '
+            +'total_test_reward,test_reward_per_episode,mean_q\n')
         self.results_file.flush()
 
     def _open_learning_file(self):
@@ -121,11 +128,15 @@ class NeuralAgent(object):
         self.learning_file.write('mean_loss,epsilon\n')
         self.learning_file.flush()
 
-    def _update_results_file(self, epoch, num_episodes, holdout_sum):
-        out = "{},{},{},{},{},{}\n".format(epoch, num_episodes,
+    def _update_results_file(self, epoch, train_episodes,test_episodes,holdout_sum):
+        out = "{},{},{},{},{},{},{},{},{}\n".format(epoch,
                                             self.network.batch_counter,
-                                            self.total_reward,
-                                            self.total_reward / float(num_episodes),
+                                            train_episodes,
+                                            test_episodes,
+                                            self.total_train_reward,
+                                            self.total_train_reward / float(train_episodes),
+                                            self.total_test_reward,
+                                            self.total_test_reward / float(test_episodes),
                                             holdout_sum)
         self.results_file.write(out)
         self.results_file.flush()
@@ -151,7 +162,7 @@ class NeuralAgent(object):
 
         self.step_counter = 0
         self.episode_reward = 0
-        self.episode_counter += 1
+        #self.episode_counter += 1
 
         
         # We report the mean loss for every epoch.
@@ -233,12 +244,12 @@ class NeuralAgent(object):
         Add the most recent data to the data set and choose an action based on
         the current policy.
         """
-
+        ctr = self.n_test_episodes if self.testing else self.n_train_episodes
         data_set.add_sample(self.last_img, 
                             self.last_action, 
                             reward, 
                             False,
-                            self.episode_counter,
+                            ctr,
                             self.step_counter,
                             self.agent_id
                             )
@@ -274,17 +285,20 @@ class NeuralAgent(object):
         """
 
         self.episode_reward += reward
-        logging.debug('episode reward: {:.2f}'.format(self.episode_reward))
+        logging.debug('episode reward: {:.2f},final reward {}'.format(self.episode_reward, reward))
         self.step_counter += 1
         total_time = time.time() - self.start_time
 
-        if self.testing:
-            # If we run out of time, only count the last episode if
-            # it was the only episode.
-            if terminal or self.episode_counter == 0:
-                self.episode_counter += 1
-                self.total_reward += self.episode_reward
+        
+        if  self.testing:
+            self.n_test_episodes += 1
+            self.total_test_reward += self.episode_reward
+
+
         else:
+            self.n_train_episodes += 1
+            self.total_train_reward += self.episode_reward
+
             # perform last training step
             loss = self._do_training()
             if loss:
@@ -294,7 +308,7 @@ class NeuralAgent(object):
                                      self.last_action,
                                      np.clip(reward, -1, 1),
                                      True,
-                                     self.episode_counter,
+                                     self.n_train_episodes,
                                      self.step_counter,
                                      self.agent_id
                                      )
@@ -322,7 +336,8 @@ class NeuralAgent(object):
 
     def start_testing(self):
         self.testing = True
-        self.total_reward = 0        
+        self.total_test_reward = 0.
+        self.test_start_episode = self.n_test_episodes        
         #self.episode_counter = 0
 
 
@@ -332,7 +347,8 @@ class NeuralAgent(object):
         self.testing = False
         holdout_size = 3200
 
-
+        #add current episode reward
+        #self.total_reward += self.episode_reward
 
         # TODO check out holdout size in original code
         # Keep a random subset of transitions to evaluate performance over time
@@ -346,13 +362,16 @@ class NeuralAgent(object):
                 holdout_sum +=  self.network.get_value(
                                     self.holdout_data[i, ...])
 
-        self._update_results_file(epoch, 
-                                  self.episode_counter - self.epoch_start_episode,
+        self._update_results_file(epoch,
+                                  max(self.n_train_episodes - self.epoch_start_episode,1),
+                                  max(self.n_test_episodes - self.test_start_episode,1),
                                   holdout_sum / holdout_size)
 
         total_time = time.time() - start_time
         logging.info("Finishing up testing took {:.2f} seconds".format(total_time))
-        self.epoch_start_episode = self.episode_counter
+        self.epoch_start_episode = self.n_train_episodes
+        self.total_train_reward = 0.
+
 
 
 

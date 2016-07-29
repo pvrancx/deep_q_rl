@@ -327,7 +327,7 @@ class DeepQLearner(DeepLearner):
         
         # Might be a slightly cheaper way by reshaping the passed-in state,
         # though that would destroy the original
-        states = np.zeros((self.batch_size, self.num_frames)+self.input_shape, 
+        states = np.zeros((1, self.num_frames)+self.input_shape, 
                           dtype=theano.config.floatX)
         states[0, ...] = state
         self.states_shared.set_value(states)
@@ -454,6 +454,10 @@ class PolicyGradientNetwork(DeepLearner):
         return givens
                                        
     def _load_data(self, states, actions, rewards, next_states, terminals):
+        #get value of last state
+        # IMPORTANT: do this first - this overwrites the states shared var
+        last_value = self.get_value(next_states[-1])
+
         #load standard batch
         super(PolicyGradientNetwork, self)._load_data(states, 
                                                     actions, 
@@ -461,19 +465,26 @@ class PolicyGradientNetwork(DeepLearner):
                                                     next_states, 
                                                     terminals)
         #also load returns
-        returns = self.disc_rewards(rewards,terminals,self.discount)
+        returns = self.disc_rewards(rewards,terminals,self.discount,last_value)
         self.returns_shared.set_value(returns)        
                     
-    def disc_rewards(self,rews,terms,gamma):
+    def disc_rewards(self,rews,terms,gamma, last_val = 0.):
         '''calculate discounted returns given reward sequence'''
-        R = 0.
-        result = np.zeros_like(rews)
-        for i in reversed(xrange(rews.size)):
-            if terms[i]: R = 0.
+        #bootstrap if last ep is cut off
+        R = 0. if terms[-1] else last_val
+        result = np.zeros_like(rews,dtype=theano.config.floatX)
+        #go through reward sequence backwards
+        for i in reversed(xrange(0,rews.size)):
+            #reset return at for new episodes
+            if terms[i] and i < rews.size-1: R = 0.
+            #accumulate discounted return
             R = rews[i] + gamma * R
             result[i] = R
-        #normalize returns, reduces variance 
-        std_R = (result - np.mean(result))/np.std(result)
+        #normalize returns - reduces variance 
+        std = np.std(result)
+        #check for  - some settings give constant rewards
+        if np.isnan(std) or std == 0.: std = 1.
+        std_R = (result - np.mean(result))/std
         return std_R
         
   
@@ -490,14 +501,14 @@ class PolicyGradientNetwork(DeepLearner):
                                                            
     def get_value(self,state):
         value,_ = self.value_probs(state)
-        return value
+        return value[0]
                                                            
     def value_probs(self, state):
         '''Returns value and action probs for given state '''
         
         # Might be a slightly cheaper way by reshaping the passed-in state,
         # though that would destroy the original
-        states = np.zeros((self.batch_size, self.num_frames)+self.input_shape, 
+        states = np.zeros((1, self.num_frames)+self.input_shape, 
                           dtype=theano.config.floatX)
         states[0, ...] = state
         self.states_shared.set_value(states)
