@@ -161,7 +161,8 @@ class NeuralAgent(object):
     def phi(self,obs):
         phi = np.zeros((self.phi_length,)+ obs.shape, 
                         dtype=theano.config.floatX)
-        phi[:-1,] = np.array(self.obs_queue)
+        if self.phi_length > 1:
+            phi[:-1,] = np.array(self.obs_queue)
         phi[-1,] = obs
         return phi
 
