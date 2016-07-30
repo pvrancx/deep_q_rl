@@ -14,11 +14,11 @@ logger = logging.getLogger()
 
 class NetworkHandler(object):
     
-    def __init__(self,network,dataset=[],batch_size = 32):
+    def __init__(self,network,dataset=[]):
         self._network = network
         self._dataset = dataset
         self.batch_counter = 0
-        self.batch_size = batch_size
+        self.batch_size = network.batch_size
     
     def choose_action(self,phi,eps):
         return self._network.choose_action(phi,eps)
