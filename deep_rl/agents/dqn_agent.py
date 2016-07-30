@@ -104,6 +104,7 @@ class NeuralAgent(object):
 
         self.batch_counter = 0      # Tracks amount of batches trained
         self.total_reward = 0
+        self.total_steps = 0
         self.holdout_data = None
 
         #generate unique agent id
@@ -177,7 +178,7 @@ class NeuralAgent(object):
            An integer action
         """
 
-        self.step_counter = 0
+        self.episode_steps = 0
         self.episode_reward = 0
         self.obs_queue.clear()
         #self.episode_counter += 1
@@ -221,7 +222,8 @@ class NeuralAgent(object):
 
         """
 
-        self.step_counter += 1
+        self.episode_steps+= 1
+        self.total_steps+= 1
         self.episode_reward += reward
 
 
@@ -241,7 +243,7 @@ class NeuralAgent(object):
                                              observation,
                                              np.clip(reward, -1, 1))
 
-                if self.step_counter % self.update_frequency == 0:
+                if self.total_steps self.update_frequency == 0:
                     loss = self._do_training()
                     #self.batch_counter += 1
                     self.loss_averages.append(loss)
@@ -268,10 +270,10 @@ class NeuralAgent(object):
                             reward, 
                             False,
                             ctr,
-                            self.step_counter,
+                            self.episode_steps,
                             self.agent_id
                             )
-        if self.step_counter >= self.phi_length:
+        if self.episode_steps >= self.phi_length:
             phi = self.phi(obs)
             action = self.network.choose_action(phi, epsilon)
         else:
@@ -304,7 +306,8 @@ class NeuralAgent(object):
 
         self.episode_reward += reward
         logging.debug('episode reward: {:.2f},final reward {}'.format(self.episode_reward, reward))
-        self.step_counter += 1
+        self.episode_steps += 1
+        self.total_steps += 1
         total_time = time.time() - self.start_time
 
         
@@ -318,7 +321,7 @@ class NeuralAgent(object):
             self.total_train_reward += self.episode_reward
 
             # perform last training step
-            if self.step_counter % self.update_frequency == 0:
+            if self.total_steps % self.update_frequency == 0:
                 loss = self._do_training()
                 if loss:
                     self.loss_averages.append(loss)
@@ -328,12 +331,12 @@ class NeuralAgent(object):
                                      np.clip(reward, -1, 1),
                                      True,
                                      self.n_train_episodes,
-                                     self.step_counter,
+                                     self.episode_steps,
                                      self.agent_id
                                      )
 
             logging.debug("steps/second: {:.2f}".format(\
-                            self.step_counter/total_time))
+                            self.episode_steps/total_time))
 
             if self.network.batch_counter > 0:
                 self._update_learning_file()
