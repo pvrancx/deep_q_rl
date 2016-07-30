@@ -14,10 +14,12 @@ import time
 import logging
 import uuid
 
+from collections import deque
+
 #import pymongo
 #from mongo_dataset import MongoDataset
 
-
+import theano
 import numpy as np
 
 #import ale_data_set
@@ -55,6 +57,8 @@ class NeuralAgent(object):
         self.test_dataset = test_dataset
 
         self.phi_length = self.dataset.phi_length
+        
+        self.obs_queue = deque()
 
         
         #MongoDataset(db,'training_data',
@@ -102,6 +106,7 @@ class NeuralAgent(object):
         self.total_reward = 0
         self.holdout_data = None
 
+        #generate unique agent id
         self.agent_id = str(uuid.uuid4())
 
         # In order to add an element to the data set we need the
@@ -146,6 +151,18 @@ class NeuralAgent(object):
                                self.epsilon)
         self.learning_file.write(out)
         self.learning_file.flush()
+        
+    def store_obs(self,obs):
+        if len(self.obs_queue) > max((self.phi_length-2),0):
+            self.obs_queue.popleft()
+        self.obs_queue.append(obs)
+        
+    def phi(self,obs):
+        phi = np.zeros((self.phi_length,)+ obs.shape, 
+                        dtype=theano.config.floatX)
+        phi[:-1,] = np.array(self.obs_queue)
+        phi[-1,] = obs
+        return phi
 
     def start_episode(self, observation):
         """
@@ -162,6 +179,7 @@ class NeuralAgent(object):
 
         self.step_counter = 0
         self.episode_reward = 0
+        self.obs_queue.clear()
         #self.episode_counter += 1
 
         
@@ -239,7 +257,7 @@ class NeuralAgent(object):
 
         return action
 
-    def _choose_action(self, data_set, epsilon, cur_img, reward):
+    def _choose_action(self, data_set, epsilon, obs, reward):
         """
         Add the most recent data to the data set and choose an action based on
         the current policy.
@@ -254,11 +272,11 @@ class NeuralAgent(object):
                             self.agent_id
                             )
         if self.step_counter >= self.phi_length:
-            phi = data_set.phi(cur_img)
+            phi = self.phi(obs)
             action = self.network.choose_action(phi, epsilon)
         else:
             action = self.rng.randint(0, self.num_actions)
-
+        self.store_obs(obs)
         return action
 
     def _do_training(self):
@@ -300,9 +318,10 @@ class NeuralAgent(object):
             self.total_train_reward += self.episode_reward
 
             # perform last training step
-            loss = self._do_training()
-            if loss:
-                self.loss_averages.append(loss)
+            if self.step_counter % self.update_frequency == 0:
+                loss = self._do_training()
+                if loss:
+                    self.loss_averages.append(loss)
             # Store the latest sample.
             self.dataset.add_sample(self.last_img,
                                      self.last_action,
