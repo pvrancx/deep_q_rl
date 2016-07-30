@@ -363,7 +363,6 @@ class PolicyGradientNetwork(DeepLearner):
         #Add variable and buffer to store return values  
         self.returns = T.col('returns')
 
-        
         self.returns_shared = theano.shared(
             np.zeros((batch_size, 1), dtype=theano.config.floatX),
             broadcastable=(False, True))
@@ -429,16 +428,16 @@ class PolicyGradientNetwork(DeepLearner):
         H = - T.sum(act_probs * T.log(act_probs),axis =1 )
         
         #policy gradient loss
-        loss = T.log(act_probs)[T.arange(self.actions.shape[0]),
-                               self.actions.reshape((-1,))].reshape((-1, 1))\
-                    *(self.returns - target_vals)\
-         #           (1-self.terminals[-1,0])*target_vals[-1,0]))
+        loss = T.log(act_probs[T.arange(self.actions.size) ,
+                               self.actions.reshape((-1,))].reshape((-1, 1)))\
+                *(self.returns - target_vals)
+
         #add entropy regulizer
         #loss += self.beta * H
                    
         #add value approximation loss ->  assumes shared network structure
         loss += 0.5*(self.returns - vals)**2
-        return T.sum(loss)
+        return T.mean(loss)
                                        
     def _get_all_params(self):
         return lasagne.layers.get_all_params([self.l_out ,
@@ -481,11 +480,11 @@ class PolicyGradientNetwork(DeepLearner):
             R = rews[i] + gamma * R
             result[i] = R
         #normalize returns - reduces variance 
-        std = np.std(result)
+       # std = np.std(result)
         #check for  - some settings give constant rewards
-        if np.isnan(std) or std == 0.: std = 1.
-        std_R = (result - np.mean(result))/std
-        return std_R
+       # if np.isnan(std) or std == 0.: std = 1.
+        #std_R = (result - np.mean(result))/std
+        return result
         
   
     def set_params(self,params):
