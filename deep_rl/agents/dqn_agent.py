@@ -243,7 +243,7 @@ class NeuralAgent(object):
                                              observation,
                                              np.clip(reward, -1, 1))
 
-                if self.total_steps self.update_frequency == 0:
+                if self.total_steps % self.update_frequency == 0:
                     loss = self._do_training()
                     #self.batch_counter += 1
                     self.loss_averages.append(loss)
