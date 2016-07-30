@@ -1,5 +1,6 @@
 
 import cv2
+import gym
 
 # Number of rows to crop off the bottom of the (downsampled) screen.
 # This is appropriate for breakout, but it may need to be modified
@@ -15,6 +16,7 @@ class ALEPreProcessor(object):
         self.resize_method = resize_method
         self.width, self.height = 160,210
         self.output_shape = (resized_width,resized_height)
+        self.observation_space = gym.spaces.Box(0.,255.,self.output_shape)
 
 
     def get_observation(self,obs):

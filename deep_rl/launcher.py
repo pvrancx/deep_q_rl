@@ -300,22 +300,20 @@ def launch(args, defaults, description):
         preprocessor = ALEPreProcessor(defaults.RESIZED_WIDTH,
                                        defaults.RESIZED_HEIGHT,
                                        parameters.resize_method,)
+        obs_space = preprocessor.observation_space
     else:
         preprocessor = None
-        
-        
-    if preprocessor is None:
         obs_space = env.observation_space
-        if isinstance(obs_space,gym.spaces.Box):   
-            obs_shape = obs_space.high.shape
-        elif isinstance(obs_space,gym.spaces.Discrete):
-            obs_shape = (1,)
-        else:
-            #TODO: handle tuple spaces
-            raise RuntimeError('observation space not supported')
         
+
+    if isinstance(obs_space,gym.spaces.Box):   
+        obs_shape = obs_space.high.shape
+    elif isinstance(obs_space,gym.spaces.Discrete):
+        obs_shape = (1,)
     else:
-        obs_shape = preprocessor.output_shape
+        #TODO: handle tuple spaces
+        raise RuntimeError('observation space not supported')
+
 
     if parameters.nn_file is None:
         if parameters.algo.lower() =='dqn':
@@ -327,20 +325,23 @@ def launch(args, defaults, description):
         else:
             raise RuntimeError('unknown algorithm')
         network = net_fn(obs_shape,
-                                         num_actions,
-                                         parameters.phi_length,
-                                         parameters.discount,
-                                         parameters.learning_rate,
-                                         parameters.rms_decay,
-                                         parameters.rms_epsilon,
-                                         parameters.momentum,
-                                         parameters.clip_delta,
-                                         parameters.freeze_interval,
-                                         parameters.batch_size,
-                                         parameters.network_type,
-                                         parameters.update_rule,
-                                         parameters.batch_accumulator,
-                                         rng)
+                         num_actions,
+                         parameters.phi_length,
+                         parameters.discount,
+                         parameters.learning_rate,
+                         parameters.rms_decay,
+                         parameters.rms_epsilon,
+                         parameters.momentum,
+                         parameters.clip_delta,
+                         parameters.freeze_interval,
+                         parameters.batch_size,
+                         parameters.network_type,
+                         parameters.update_rule,
+                         parameters.batch_accumulator,
+                         rng,
+                         obs_space.low,
+                         obs_space.high
+                         )
         with open(os.path.join(save_path,'net.pkl'),'w') as f:
             cPickle.dump(network,f)
     else:

@@ -33,7 +33,7 @@ class DeepLearner(object):
                  num_frames, discount, learning_rate, rho,
                  rms_epsilon, momentum, clip_delta, freeze_interval,
                  batch_size, network_type, update_rule,
-                 batch_accumulator, rng, input_scale=255.0,
+                 batch_accumulator, rng, obs_low, obs_high,
                  conv_type = 'cpu'):
 
         #store settings
@@ -50,8 +50,9 @@ class DeepLearner(object):
         self.freeze_interval = freeze_interval
         self.rng = rng
         self.batch_accumulator = batch_accumulator
-        self.input_scale = input_scale
         self.conv_type = conv_type
+        self.obs_low = obs_low
+        self.obs_high = obs_high
         
         lasagne.random.set_rng(self.rng)
 
@@ -254,19 +255,20 @@ class DeepQLearner(DeepLearner):
                  num_frames, discount, learning_rate, rho,
                  rms_epsilon, momentum, clip_delta, freeze_interval,
                  batch_size, network_type, update_rule,
-                 batch_accumulator, rng, input_scale=255.0,
+                 batch_accumulator, rng, obs_low, obs_high,
                  conv_type = 'cpu'):
         super(DeepQLearner,self).__init__(input_shape, num_actions,
                  num_frames, discount, learning_rate, rho,
                  rms_epsilon, momentum, clip_delta, freeze_interval,
                  batch_size, network_type, update_rule,
-                 batch_accumulator, rng, input_scale=255.0,
+                 batch_accumulator, rng,  obs_low, obs_high,
                  conv_type = 'cpu')
         
 
         #create q_value function
         q_vals = lasagne.layers.get_output(self.l_out, 
-                                           self.states/self.input_scale)
+                                           ((self.states+self.obs_low)/
+                                            (self.obs_high-self.obs_low)))
         
         
         self._q_vals = theano.function([], q_vals,
@@ -277,14 +279,17 @@ class DeepQLearner(DeepLearner):
         '''DQN loss'''
         #network output
         q_vals = lasagne.layers.get_output(self.l_out, 
-                                           self.states/self.input_scale)
+                                           (self.states+self.obs_low)/
+                                            (self.obs_high-self.obs_low))
          #target network
         if self.freeze_interval > 0:
             next_q_vals = lasagne.layers.get_output(self.next_l_out,
-                                                    self.next_states / self.input_scale)
+                                                    (self.next_states+self.obs_low)/
+                                                    (self.obs_high-self.obs_low))
         else:
             next_q_vals = lasagne.layers.get_output(self.l_out,
-                                                    self.next_states / self.input_scale)
+                                                    (self.states+self.obs_low)/
+                                                    (self.obs_high-self.obs_low))
         next_q_vals = theano.gradient.disconnected_grad(next_q_vals)
 
         target = (self.rewards +
@@ -355,7 +360,7 @@ class PolicyGradientNetwork(DeepLearner):
                  num_frames, discount, learning_rate, rho,
                  rms_epsilon, momentum, clip_delta, freeze_interval,
                  batch_size, network_type, update_rule,
-                 batch_accumulator, rng, input_scale=255.0,
+                 batch_accumulator, rng, obs_low, obs_high,
                  conv_type = 'cpu', beta = 1e-3):
                
         self.beta = beta
@@ -371,14 +376,15 @@ class PolicyGradientNetwork(DeepLearner):
                  num_frames, discount, learning_rate, rho,
                  rms_epsilon, momentum, clip_delta, freeze_interval,
                  batch_size, network_type, update_rule,
-                 batch_accumulator, rng, input_scale=255.0,
+                 batch_accumulator, rng, obs_low, obs_high,
                  conv_type = 'cpu')
      
         #create function to get state value and action probabilities
         vals,act_prob = lasagne.layers.get_output(
                             [self.l_out,
                              self.l_out_pol], 
-                             self.states/self.input_scale)
+                             (self.states+self.obs_low)/
+                             (self.obs_high-self.obs_low))
         
         
         self._outp = theano.function([], [vals,act_prob],
@@ -415,7 +421,8 @@ class PolicyGradientNetwork(DeepLearner):
         #network outputs
         vals, act_probs =  lasagne.layers.get_output([self.l_out ,
                                                       self.l_out_pol], 
-                                                      self.states /self.input_scale)
+                                                      (self.states+self.obs_low)/
+                                                      (self.obs_high-self.obs_low))
         #target values for policy advantage function
         #if self.freeze_interval > 0:
         #    target_vals = lasagne.layers.get_output(self.next_l_out,
