@@ -84,10 +84,13 @@ class SequentialDataSet(DataSetInterface):
         phi[-1] = obs
         return phi
         
-        
+    #TODO: this is only estimate
+    #actually need to subtract min(#previous_steps_in_episode,phi_length)
+    #for each terminal state
     def __len__(self):
-        return max(0,self._n_steps()- self.phi_length - 
-            self._n_term() * self.phi_length)
+        return max(0,self._n_steps()#number of tranistions
+                - self.phi_length #subtract first phi steps
+                - self._n_term() * self.phi_length)#terminal states can be start
             
     def _pop_step(self):
         s = self._obs.popleft()

@@ -435,20 +435,20 @@ class PolicyGradientNetwork(DeepLearner):
         H = - T.sum(act_probs * T.log(act_probs),axis =1 )
         
         #policy gradient loss
-        loss = T.log(act_probs[T.arange(self.actions.size) ,
+        loss = -T.log(act_probs[T.arange(self.actions.size) ,
                                self.actions.reshape((-1,))].reshape((-1, 1)))\
-                *(self.returns - target_vals)
+                *(self.returns)# - target_vals)
 
         #add entropy regulizer
         #loss += self.beta * H
                    
         #add value approximation loss ->  assumes shared network structure
-        loss += 0.5*(self.returns - vals)**2
+        #loss += 0.5*(self.returns - vals)**2
         return T.mean(loss)
                                        
     def _get_all_params(self):
-        return lasagne.layers.get_all_params([self.l_out ,
-                                       self.l_out_pol])
+        return lasagne.layers.get_all_params(self.l_out_pol)
+        
     def _get_givens(self):
         givens = {
             self.states: self.states_shared,

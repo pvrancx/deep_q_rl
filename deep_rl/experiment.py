@@ -18,18 +18,21 @@ CROP_OFFSET = 8
 
 class GymExperiment(object):
     def __init__(self, env, agent, preprocessor, num_epochs, epoch_length, 
-                 test_length, rng, progress_frequency):
+                 test_length, episode_length, rng, progress_frequency, 
+                 display = False):
         self.env = env
         self.agent = agent
         self.num_epochs = num_epochs
         self.epoch_length = epoch_length
         self.test_length = test_length
+        self.max_episode_length = episode_length
         self.preprocessor = preprocessor
 
 
         self.rng = rng
         self.progress_frequency = progress_frequency
         self.experiment_start_time = time.time()
+        self.display = display
 
 
     def run(self):
@@ -82,7 +85,11 @@ class GymExperiment(object):
         while self.steps_left_this_epoch > 0:
             logging.debug(prefix + " epoch: " + str(epoch) + " steps_left: " +
                          str(self.steps_left_this_epoch))
-            _, steps_run = self.run_episode(self.steps_left_this_epoch, testing)
+            if self.max_episode_length: 
+                steps = min(self.steps_left_this_epoch,self.max_episode_length)
+            else:
+                steps = self.steps_left_this_epoch
+            _, steps_run = self.run_episode(steps, testing)
 
         total_time = time.time() - epoch_start_time
         logging.info("Finished {} epoch {}; took {:.2f} seconds for {} steps ({:.2f} steps/s on avg)".format(
@@ -114,7 +121,9 @@ class GymExperiment(object):
         num_steps = 0
         while True:
             obs,reward,terminal,_ = self.env.step(action)
-
+            if self.display:
+                self.env.render()
+                
             num_steps += 1
             self.steps_left_this_epoch -= 1
 

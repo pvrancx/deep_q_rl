@@ -98,6 +98,10 @@ def process_args(args, defaults, description):
     exp_group.add_argument('-s', '--steps-per-epoch', dest="steps_per_epoch",
                         type=int, default=defaults.STEPS_PER_EPOCH,
                         help='Number of steps per epoch (default: %(default)s)')
+    exp_group.add_argument('--max-episode-steps', dest="steps_per_episode",
+                        type=int, default=0,
+                        help='Max number of steps per episode - 0 for unlimited'\
+                        +'(default: %(default)s)')
     exp_group.add_argument('-t', '--test-length', dest="steps_per_test",
                         type=int, default=defaults.STEPS_PER_TEST,
                         help='Number of steps per test (default: %(default)s)')
@@ -289,9 +293,6 @@ def launch(args, defaults, description):
 
 
 
-    # TODO make it display 
-    if parameters.display_screen:
-        pass
 
     env = gym.make(parameters.environment)
     num_actions = env.action_space.n
@@ -435,8 +436,10 @@ def launch(args, defaults, description):
                                               parameters.epochs,
                                               parameters.steps_per_epoch,
                                               parameters.steps_per_test,
+                                              parameters.steps_per_episode,
                                               rng,
-                                              parameters.progress_frequency)
+                                              parameters.progress_frequency,
+                                              parameters.display_screen)
 
         #run experiment
         exp.run()
@@ -466,8 +469,11 @@ def launch(args, defaults, description):
                                               parameters.epochs,
                                               parameters.steps_per_epoch,
                                               parameters.steps_per_test,
+                                              parameters.steps_per_episode,
+                                              parameters.steps_per_episode,
                                               rng,
-                                              parameters.progress_frequency)
+                                              parameters.progress_frequency,
+                                              parameters.display_screen)
 
 
         exp.run()
@@ -590,8 +596,10 @@ def launch(args, defaults, description):
                                               parameters.epochs,
                                               parameters.steps_per_epoch,
                                               parameters.steps_per_test,
+                                              parameters.steps_per_episode,
                                               rng,
-                                              parameters.progress_frequency)
+                                              parameters.progress_frequency,
+                                              parameters.display_screen)
             p = multiprocessing.Process(target=run_exp, args=(exp,))
             procs.append(p)
             p.start()
